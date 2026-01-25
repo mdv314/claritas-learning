@@ -23,16 +23,19 @@ const Header = () => (
 
 export default function TopicPage() {
     const searchParams = useSearchParams();
+    const courseId = searchParams.get('courseId');
     const unitNumber = searchParams.get('unit');
     const subtopicIndex = searchParams.get('subtopic');
     const topicName = searchParams.get('name');
+
+    const backUrl = courseId ? `/course/${courseId}` : '/generate';
 
     return (
         <div className="min-h-screen bg-[#fafafa]">
             <Header />
             <div className="max-w-4xl mx-auto py-12 px-6">
                 <Link
-                    href="/generate"
+                    href={backUrl}
                     className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-8"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

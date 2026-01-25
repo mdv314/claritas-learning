@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { CourseView } from '@/components/CourseView';
+import { useRouter } from 'next/navigation';
 
 // --- Types ---
 
@@ -180,16 +180,14 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
 };
 
 export default function GeneratePage() {
-    const [courseData, setCourseData] = useState<CoursePlan | null>(null);
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
 
     const handleGenerate = async (formData: FormData) => {
         setIsLoading(true);
         try {
-            // Assuming backend is running on port 5000 - configure proxy in production
             const response = await fetch('http://127.0.0.1:5000/generate_course', {
                 method: 'POST',
-                // headers: { 'Content-Type': 'application/json' }, // Fetch automatically sets Content-Type for FormData
                 body: formData,
             });
 
@@ -199,11 +197,14 @@ export default function GeneratePage() {
 
             const data = await response.json();
             console.log("DEBUG: Course Data:", data);
-            setCourseData(data);
+
+            // Redirect to the course page
+            if (data.course_id) {
+                router.push(`/course/${data.course_id}`);
+            }
         } catch (error) {
             console.error('Failed to generate course:', error);
             alert('Something went wrong. Please check if the backend is running.');
-        } finally {
             setIsLoading(false);
         }
     };
@@ -211,11 +212,7 @@ export default function GeneratePage() {
     return (
         <div className="min-h-screen bg-[#fafafa]">
             <Header />
-            {courseData ? (
-                <CourseView course={courseData} />
-            ) : (
-                <GenerateForm onSubmit={handleGenerate} isLoading={isLoading} />
-            )}
+            <GenerateForm onSubmit={handleGenerate} isLoading={isLoading} />
         </div>
     );
 }

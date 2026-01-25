@@ -47,18 +47,20 @@ os.makedirs(COURSE_PLANS_DIR, exist_ok=True)
 def save_course_plan_locally(course_plan: dict, topic: str) -> str:
     """
     Save a course plan to a local JSON file.
-    Returns the file path of the saved course plan.
+    Returns the course ID (filename without extension).
     """
     # Create a unique filename using timestamp and UUID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
     # Sanitize topic for filename
     safe_topic = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in topic)[:50]
-    filename = f"{timestamp}_{safe_topic}_{unique_id}.json"
+    course_id = f"{timestamp}_{safe_topic}_{unique_id}"
+    filename = f"{course_id}.json"
     filepath = os.path.join(COURSE_PLANS_DIR, filename)
 
     # Save the course plan with metadata
     data_to_save = {
+        "course_id": course_id,
         "saved_at": datetime.now().isoformat(),
         "course_plan": course_plan
     }
@@ -66,7 +68,7 @@ def save_course_plan_locally(course_plan: dict, topic: str) -> str:
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data_to_save, f, indent=2, ensure_ascii=False)
 
-    return filepath
+    return course_id
 
 @app.get('/')
 def index():
@@ -130,14 +132,30 @@ async def generate_course_endpoint(
         )
 
         # Save the course plan locally for future use
-        saved_path = save_course_plan_locally(result, topic)
-        print(f"Course plan saved to: {saved_path}")
+        course_id = save_course_plan_locally(result, topic)
+        print(f"Course plan saved with ID: {course_id}")
 
-        return result
+        # Return course data with ID
+        return {"course_id": course_id, **result}
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/course/{course_id}")
+async def get_course(course_id: str):
+    """
+    Fetch a saved course plan by its ID.
+    """
+    filepath = os.path.join(COURSE_PLANS_DIR, f"{course_id}.json")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # Return the course plan with its ID
+    return {"course_id": course_id, **data["course_plan"]}
 
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=5000)

@@ -61,7 +61,7 @@ const saveProgress = (courseId: string, progress: CourseProgress) => {
     }
 };
 
-export const CourseView = ({ course }: { course: CoursePlan }) => {
+export const CourseView = ({ course, courseId: propCourseId }: { course: CoursePlan, courseId?: string }) => {
     const router = useRouter();
     const [activeUnit, setActiveUnit] = useState<number | null>(1);
     const [progress, setProgress] = useState<CourseProgress>({
@@ -69,7 +69,8 @@ export const CourseView = ({ course }: { course: CoursePlan }) => {
         completedTopics: [],
         lastVisited: null
     });
-    const courseId = getCourseId(course.courseTitle);
+    // Use provided courseId or generate one from title
+    const courseId = propCourseId || getCourseId(course.courseTitle);
 
     // Load progress from localStorage on mount
     useEffect(() => {
@@ -97,6 +98,7 @@ export const CourseView = ({ course }: { course: CoursePlan }) => {
 
         // Navigate to topic page
         const params = new URLSearchParams({
+            courseId: courseId,
             unit: unitNumber.toString(),
             subtopic: subtopicIndex.toString(),
             name: subtopicName
