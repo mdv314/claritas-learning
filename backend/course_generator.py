@@ -34,7 +34,6 @@ class CourseGenerator:
     def __init__(self):
         try:
             self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-            # Using 'gemini-2.0-flash-exp' as a proxy for "Gemini 3" or latest available high-performance model
             self.model_name = "gemini-3-flash-preview" 
         except Exception as e:
             print(f"Error initializing Gemini client: {e}")
