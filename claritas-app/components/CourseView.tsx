@@ -89,41 +89,39 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
         saveProgress(courseId, newProgress);
     };
 
-    const handleTopicClick = (unitNumber: number, subtopicIndex: number, subtopicName: string) => {
-        // Update last visited
-        const topicKey = `${unitNumber}-${subtopicIndex}`;
-        const newProgress = { ...progress, lastVisited: topicKey };
-        setProgress(newProgress);
-        saveProgress(courseId, newProgress);
-
-        // Navigate to topic page
+    const handleModuleClick = (unitNumber: number) => {
+        // Navigate to module page
         const params = new URLSearchParams({
             courseId: courseId,
-            unit: unitNumber.toString(),
-            subtopic: subtopicIndex.toString(),
-            name: subtopicName
+            unit: unitNumber.toString()
         });
-        router.push(`/course/topic?${params.toString()}`);
+        router.push(`/course/module?${params.toString()}`);
     };
 
     const handlePickUpWhereLeftOff = () => {
         if (progress.lastVisited) {
-            const [unitNumber, subtopicIndex] = progress.lastVisited.split('-').map(Number);
-            const unit = course.units.find(u => u.unitNumber === unitNumber);
-            if (unit && unit.subtopics[subtopicIndex]) {
-                handleTopicClick(unitNumber, subtopicIndex, unit.subtopics[subtopicIndex]);
-            }
+            const [unitNumber] = progress.lastVisited.split('-').map(Number);
+            // Navigate to the module containing the last visited topic
+            handleModuleClick(unitNumber);
         } else {
-            // If no last visited, go to first topic
+            // If no last visited, go to first module
             const firstUnit = course.units[0];
-            if (firstUnit && firstUnit.subtopics[0]) {
-                handleTopicClick(firstUnit.unitNumber, 0, firstUnit.subtopics[0]);
+            if (firstUnit) {
+                handleModuleClick(firstUnit.unitNumber);
             }
         }
     };
 
     const isTopicCompleted = (unitNumber: number, subtopicIndex: number) => {
         return progress.completedTopics.includes(`${unitNumber}-${subtopicIndex}`);
+    };
+
+    // Calculate module progress
+    const getModuleProgress = (unit: Unit) => {
+        const completed = unit.subtopics.filter((_, idx) =>
+            isTopicCompleted(unit.unitNumber, idx)
+        ).length;
+        return { completed, total: unit.subtopics.length };
     };
 
     return (
@@ -187,75 +185,93 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
                 </div>
 
                 <div className="divide-y divide-gray-100">
-                    {course.units.map((unit) => (
-                        <div key={unit.unitNumber} className="group">
-                            <button
-                                onClick={() => setActiveUnit(activeUnit === unit.unitNumber ? null : unit.unitNumber)}
-                                className={`w-full text-left px-6 py-5 flex items-center justify-between hover:bg-gray-50 transition-colors ${activeUnit === unit.unitNumber ? 'bg-blue-50/50' : ''}`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-colors ${activeUnit === unit.unitNumber ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-500'}`}>
-                                        {unit.unitNumber}
-                                    </div>
-                                    <div>
-                                        <h3 className={`font-semibold text-lg ${activeUnit === unit.unitNumber ? 'text-blue-900' : 'text-gray-900'}`}>{unit.title}</h3>
-                                        <p className="text-sm text-gray-500">{unit.duration}</p>
-                                    </div>
-                                </div>
-                                <div className="text-gray-400">
-                                    {/* Chevron Icon */}
-                                    <svg className={`w-5 h-5 transform transition-transform ${activeUnit === unit.unitNumber ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                </div>
-                            </button>
+                    {course.units.map((unit) => {
+                        const moduleProgress = getModuleProgress(unit);
+                        const allCompleted = moduleProgress.completed === moduleProgress.total;
 
-                            {activeUnit === unit.unitNumber && (
-                                <div className="px-6 pb-6 pt-2 bg-blue-50/30">
-                                    <p className="text-gray-600 mb-4 ml-12 text-sm">{unit.description}</p>
-                                    <ul className="space-y-3 ml-12">
-                                        {unit.subtopics.map((sub, idx) => {
-                                            const completed = isTopicCompleted(unit.unitNumber, idx);
-                                            const isClickable = progress.isEnrolled;
-
-                                            return (
-                                                <li key={idx}>
-                                                    {isClickable ? (
-                                                        <button
-                                                            onClick={() => handleTopicClick(unit.unitNumber, idx, sub)}
-                                                            className="flex items-start gap-3 w-full text-left hover:bg-blue-100/50 rounded-lg p-2 -ml-2 transition-colors"
-                                                        >
-                                                            <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${completed ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
-                                                                {completed ? (
-                                                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                ) : (
-                                                                    <div className="w-2 h-2 rounded-full bg-gray-300" />
-                                                                )}
-                                                            </div>
-                                                            <span className="text-gray-700 hover:text-blue-700">{sub}</span>
-                                                        </button>
-                                                    ) : (
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="mt-1 w-5 h-5 rounded-full border border-gray-300 bg-white flex items-center justify-center shrink-0">
-                                                                <div className="w-2 h-2 rounded-full bg-gray-300" />
-                                                            </div>
-                                                            <span className="text-gray-700">{sub}</span>
-                                                        </div>
-                                                    )}
-                                                </li>
-                                            );
-                                        })}
-                                        <li className="flex items-center gap-3 pt-2">
-                                            <div className="w-5 h-5 flex items-center justify-center text-blue-600">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        return (
+                            <div key={unit.unitNumber} className="group">
+                                <div className={`flex items-center justify-between px-6 py-5 ${activeUnit === unit.unitNumber ? 'bg-blue-50/50' : ''}`}>
+                                    <button
+                                        onClick={() => setActiveUnit(activeUnit === unit.unitNumber ? null : unit.unitNumber)}
+                                        className="flex items-center gap-4 text-left hover:opacity-80 transition-opacity flex-1"
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-colors ${
+                                            allCompleted
+                                                ? 'bg-green-500 border-green-500 text-white'
+                                                : activeUnit === unit.unitNumber
+                                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                                    : 'bg-white border-gray-300 text-gray-500'
+                                        }`}>
+                                            {allCompleted ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            ) : (
+                                                unit.unitNumber
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className={`font-semibold text-lg ${activeUnit === unit.unitNumber ? 'text-blue-900' : 'text-gray-900'}`}>{unit.title}</h3>
+                                            <div className="flex items-center gap-3 text-sm text-gray-500">
+                                                <span>{unit.duration}</span>
+                                                <span>•</span>
+                                                <span>{moduleProgress.completed}/{moduleProgress.total} topics</span>
                                             </div>
-                                            <span className="font-medium text-blue-900 text-sm">Quiz: {unit.quiz.title} ({unit.quiz.questionCount} questions)</span>
-                                        </li>
-                                    </ul>
+                                        </div>
+                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        {progress.isEnrolled && (
+                                            <button
+                                                onClick={() => handleModuleClick(unit.unitNumber)}
+                                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                            >
+                                                Go to Module
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => setActiveUnit(activeUnit === unit.unitNumber ? null : unit.unitNumber)}
+                                            className="text-gray-400 hover:text-gray-600 p-1"
+                                        >
+                                            <svg className={`w-5 h-5 transform transition-transform ${activeUnit === unit.unitNumber ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    ))}
+
+                                {activeUnit === unit.unitNumber && (
+                                    <div className="px-6 pb-6 pt-2 bg-blue-50/30">
+                                        <p className="text-gray-600 mb-4 ml-12 text-sm">{unit.description}</p>
+                                        <ul className="space-y-2 ml-12">
+                                            {unit.subtopics.map((sub, idx) => {
+                                                const completed = isTopicCompleted(unit.unitNumber, idx);
+
+                                                return (
+                                                    <li key={idx} className="flex items-start gap-3 py-1">
+                                                        <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${completed ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
+                                                            {completed ? (
+                                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            ) : (
+                                                                <div className="w-2 h-2 rounded-full bg-gray-300" />
+                                                            )}
+                                                        </div>
+                                                        <span className={`text-sm ${completed ? 'text-gray-500' : 'text-gray-700'}`}>{sub}</span>
+                                                    </li>
+                                                );
+                                            })}
+                                            <li className="flex items-center gap-3 pt-2">
+                                                <div className="w-5 h-5 flex items-center justify-center text-blue-600">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                </div>
+                                                <span className="font-medium text-blue-900 text-sm">Quiz: {unit.quiz.title} ({unit.quiz.questionCount} questions)</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

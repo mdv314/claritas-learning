@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -21,14 +21,19 @@ const Header = () => (
     </header>
 );
 
-export default function TopicPage() {
+function TopicPageContent() {
     const searchParams = useSearchParams();
     const courseId = searchParams.get('courseId');
     const unitNumber = searchParams.get('unit');
     const subtopicIndex = searchParams.get('subtopic');
     const topicName = searchParams.get('name');
 
-    const backUrl = courseId ? `/course/${courseId}` : '/generate';
+    // Navigate back to the module page instead of course overview
+    const backUrl = courseId && unitNumber
+        ? `/course/module?courseId=${courseId}&unit=${unitNumber}`
+        : courseId
+            ? `/course/${courseId}`
+            : '/generate';
 
     return (
         <div className="min-h-screen bg-[#fafafa]">
@@ -41,7 +46,7 @@ export default function TopicPage() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                    Back to Course
+                    Back to Module
                 </Link>
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
@@ -64,5 +69,23 @@ export default function TopicPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function TopicPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#fafafa]">
+                <Header />
+                <div className="flex items-center justify-center h-[60vh]">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-gray-500">Loading topic...</p>
+                    </div>
+                </div>
+            </div>
+        }>
+            <TopicPageContent />
+        </Suspense>
     );
 }
