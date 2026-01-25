@@ -86,7 +86,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                     <input
                         type="text"
                         required
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all text-gray-900"
                         placeholder="e.g. Astrophysics, Python Programming, 18th Century History"
                         value={topic}
                         onChange={(e) => setTopic(e.target.value)}
@@ -97,7 +97,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Skill Level</label>
                         <select
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white text-gray-900"
                             value={skillLevel}
                             onChange={(e) => setSkillLevel(e.target.value)}
                         >
@@ -109,7 +109,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Age Group</label>
                         <select
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white text-gray-900"
                             value={ageGroup}
                             onChange={(e) => setAgeGroup(e.target.value)}
                         >
@@ -125,7 +125,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                     <label className="block text-sm font-medium text-gray-700 mb-2">Related Materials (Optional)</label>
                     <div className="space-y-4">
                         <textarea
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all min-h-[100px]"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all min-h-[100px] text-gray-900"
                             placeholder="Paste structure, syllabus content, or notes here..."
                             value={materials}
                             onChange={(e) => setMaterials(e.target.value)}
@@ -152,7 +152,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes (Optional)</label>
                     <textarea
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all min-h-[80px]"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all min-h-[80px] text-gray-900"
                         placeholder="Any specific goals or preferences?"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}

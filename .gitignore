@@ -4,3 +4,6 @@ backend/.env
 backend/__pycache__/
 backend/testing/
 CLAUDE.md
+todo.md
+reference_images/
+backend/course_plans/

@@ -1,4 +1,7 @@
 import os
+import json
+import uuid
+from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +39,34 @@ supabase: Client = create_client(
 
 # Initialize CourseGenerator
 course_generator = CourseGenerator()
+
+# Directory to store course plans locally
+COURSE_PLANS_DIR = os.path.join(os.path.dirname(__file__), "course_plans")
+os.makedirs(COURSE_PLANS_DIR, exist_ok=True)
+
+def save_course_plan_locally(course_plan: dict, topic: str) -> str:
+    """
+    Save a course plan to a local JSON file.
+    Returns the file path of the saved course plan.
+    """
+    # Create a unique filename using timestamp and UUID
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = str(uuid.uuid4())[:8]
+    # Sanitize topic for filename
+    safe_topic = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in topic)[:50]
+    filename = f"{timestamp}_{safe_topic}_{unique_id}.json"
+    filepath = os.path.join(COURSE_PLANS_DIR, filename)
+
+    # Save the course plan with metadata
+    data_to_save = {
+        "saved_at": datetime.now().isoformat(),
+        "course_plan": course_plan
+    }
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data_to_save, f, indent=2, ensure_ascii=False)
+
+    return filepath
 
 @app.get('/')
 def index():
@@ -97,6 +128,11 @@ async def generate_course_endpoint(
             file_data=file_data,
             mime_type=mime_type
         )
+
+        # Save the course plan locally for future use
+        saved_path = save_course_plan_locally(result, topic)
+        print(f"Course plan saved to: {saved_path}")
+
         return result
     except Exception as e:
         import traceback
