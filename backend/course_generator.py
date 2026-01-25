@@ -30,6 +30,21 @@ class CoursePlan(BaseModel):
     metadata: CourseMetadata = Field(description="Metadata about the course")
     units: List[Unit] = Field(description="List of units in the course")
 
+class QuizQuestion(BaseModel):
+    question: str = Field(description="The question text")
+    options: List[str] = Field(description="List of multiple choice options")
+    correctAnswerIndex: int = Field(description="Index of the correct answer (0-based)")
+    explanation: str = Field(description="Explanation of why the answer is correct")
+
+class TopicSection(BaseModel):
+    heading: str = Field(description="Section heading")
+    content: str = Field(description="Section content in markdown format")
+
+class TopicContent(BaseModel):
+    title: str = Field(description="Title of the topic/lesson")
+    sections: List[TopicSection] = Field(description="Content sections")
+    quiz: List[QuizQuestion] = Field(description="Quiz questions for this topic")
+
 class CourseGenerator:
     def __init__(self):
         try:
@@ -88,4 +103,42 @@ class CourseGenerator:
         except Exception as e:
             print(f"Error generating course: {e}")
             # Fallback or error handling
+            return {"error": str(e)}
+
+    def _load_topic_prompt(self) -> str:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'topic_content.txt')
+        with open(prompt_path, 'r') as f:
+            return f.read()
+
+    def generate_topic_content(self, course_title: str, unit_title: str, subtopic: str,
+                             skill_level: str, age_group: str, additional_context: str = "") -> Dict[str, Any]:
+        
+        system_template = self._load_topic_prompt()
+        
+        formatted_prompt = system_template.format(
+            course_title=course_title,
+            unit_title=unit_title,
+            subtopic=subtopic,
+            skill_level=skill_level,
+            age_group=age_group,
+            additional_context=additional_context
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[formatted_prompt],
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': TopicContent
+                }
+            )
+            
+            if response.text:
+                # print("DEBUG: Gemini Topic Response:", response.text)
+                return json.loads(response.text)
+            else:
+                raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            print(f"Error generating topic content: {e}")
             return {"error": str(e)}

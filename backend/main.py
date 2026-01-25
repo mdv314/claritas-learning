@@ -52,8 +52,8 @@ def save_course_plan_locally(course_plan: dict, topic: str) -> str:
     # Create a unique filename using timestamp and UUID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
-    # Sanitize topic for filename
-    safe_topic = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in topic)[:50]
+    # Sanitize topic for filename - replace spaces with underscores, remove special chars
+    safe_topic = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in topic)[:50]
     course_id = f"{timestamp}_{safe_topic}_{unique_id}"
     filename = f"{course_id}.json"
     filepath = os.path.join(COURSE_PLANS_DIR, filename)
@@ -156,6 +156,73 @@ async def get_course(course_id: str):
 
     # Return the course plan with its ID
     return {"course_id": course_id, **data["course_plan"]}
+
+class TopicRequest(BaseModel):
+    courseId: str
+    unitNumber: int
+    subtopicIndex: int
+
+@app.post("/generate_topic")
+async def generate_topic(request: TopicRequest):
+    """
+    Generates content for a specific topic within a course.
+    """
+    try:
+        # Load course plan
+        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Course not found")
+            
+        with open(filepath, 'r', encoding='utf-8') as f:
+            course_data = json.load(f)
+            
+        course_plan = course_data["course_plan"]
+        
+        # Check if topic content already exists
+        topic_filename = f"{request.courseId}_topic_{request.unitNumber}_{request.subtopicIndex}.json"
+        topic_filepath = os.path.join(COURSE_PLANS_DIR, topic_filename)
+        
+        if os.path.exists(topic_filepath):
+            with open(topic_filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+        # Find the specific unit and subtopic
+        units = course_plan.get("units", [])
+        unit = next((u for u in units if u.get("unitNumber") == request.unitNumber), None)
+        
+        if not unit:
+            raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
+            
+        subtopics = unit.get("subtopics", [])
+        if request.subtopicIndex < 0 or request.subtopicIndex >= len(subtopics):
+            raise HTTPException(status_code=404, detail="Subtopic not found")
+            
+        subtopic_title = subtopics[request.subtopicIndex]
+        
+        # Generate content
+        content = course_generator.generate_topic_content(
+            course_title=course_plan.get("courseTitle"),
+            unit_title=unit.get("title"),
+            subtopic=subtopic_title,
+            skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
+            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult"),
+            additional_context=course_plan.get("description", "")
+        )
+        
+        if "error" in content:
+            raise HTTPException(status_code=500, detail=content["error"])
+            
+        # Save locally
+        with open(topic_filepath, 'w', encoding='utf-8') as f:
+            json.dump(content, f, indent=2, ensure_ascii=False)
+            
+        return content
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in generate_topic: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=5000)
