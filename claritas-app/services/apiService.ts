@@ -1,7 +1,7 @@
 // services/apiService.ts
 import { PreferenceProfile } from "../types";
 
-const API_BASE_URL = "http://127.0.0.1:8000"; // Updated to match your FastAPI port
+const API_BASE_URL = "http://127.0.0.5000"; // Updated to match your FastAPI port
 
 export const generateCourse = async (profile: PreferenceProfile): Promise<any> => {
     const formData = new FormData();
