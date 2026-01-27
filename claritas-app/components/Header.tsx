@@ -1,8 +1,7 @@
 "use client";
-import React from "react";
 import { useRouter } from "next/navigation";
 import Image from 'next/image'
-import logo from "./claritas-logo.png"
+import logo from "../app/claritas-logo.png"
 
 const Header = () => {
     const router = useRouter();
