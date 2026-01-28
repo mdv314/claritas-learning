@@ -1,7 +1,7 @@
 // services/apiService.ts
 import { PreferenceProfile } from "../types";
 
-const API_BASE_URL = "http://127.0.0.5000"; // Updated to match your FastAPI port
+const API_BASE_URL = "http://127.0.0.5000";
 
 export const generateCourse = async (profile: PreferenceProfile): Promise<any> => {
     const formData = new FormData();
@@ -13,11 +13,9 @@ export const generateCourse = async (profile: PreferenceProfile): Promise<any> =
     formData.append('additional_notes', `Learning Style: ${profile.learningStyle}. Traits: ${profile.traits.join(', ')}`);
     formData.append('materials_text', `Weaknesses: ${profile.weaknesses.join(', ')}`);
     
-    // 'file' is optional in your FastAPI route, so we can omit it here
-
     const response = await fetch(`${API_BASE_URL}/generate_course`, {
         method: "POST",
-        body: formData, // No headers needed; Fetch sets multipart/form-data automatically
+        body: formData,
     });
 
     if (!response.ok) {
