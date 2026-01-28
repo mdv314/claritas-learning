@@ -12,11 +12,10 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import Header from '../../components/Header'
 
 type AuthMode = 'login' | 'signup';
 
-const SignInPage = () => {
+export default function SignInPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -71,7 +70,6 @@ const SignInPage = () => {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-200 via-slate-50 to-emerald-100">
 
-    <Header />
       {/* Background Orbs */}
       <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
       <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
@@ -238,5 +236,3 @@ const SignInPage = () => {
     </div>
   );
 };
-
-export default SignInPage;
