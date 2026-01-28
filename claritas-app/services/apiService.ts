@@ -25,14 +25,14 @@ export const generateCourse = async (profile: PreferenceProfile): Promise<any> =
     return response.json();
 };
 
-export const createUser = async (user: UserInformation): Promise<any> => {
-    console.log(user)
+export const createUser = async (userCreation: UserInformation): Promise<any> => {
+    console.log(userCreation)
     const response = await fetch('http://127.0.0.1:5000/create_user', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json', // <-- important
+            'Content-Type': 'application/json',
         },
-        body: JSON.stringify(user),
+        body: JSON.stringify(userCreation),
     });
 
     if (!response.ok) {
@@ -47,7 +47,7 @@ export const loginUser = async (loginAttempt: LoginInfo): Promise<AuthResponse> 
     const response = await fetch('http://127.0.0.1:5000/login', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json', // <-- important
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify(loginAttempt),
     });

@@ -32,9 +32,14 @@ export default function LoginForm() {
         setIsLoading(true);
 
         try {
-            const result = await loginUser(loginData)
-            console.log('Authentication successful:', { mode: 'login', email: result.access_token });
-            setSuccess(true);
+          const result = await loginUser(loginData)
+          console.log('Authentication successful:', { mode: 'login', email: result.user_id });
+          const accessToken = "your-jwt-here";
+          const expires = new Date();
+          expires.setHours(expires.getHours() + 6);
+
+          document.cookie = `access_token=${accessToken}; expires=${expires.toUTCString()}; path=/`;
+          setSuccess(true);
         } catch (err) {
             setError("An unexpected error occurred. Please try again.");
         } finally {
