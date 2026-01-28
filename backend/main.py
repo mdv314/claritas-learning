@@ -293,7 +293,7 @@ class LoginRequest(BaseModel):
 @app.post("/login")
 def login(login: LoginRequest):
     try:
-        # 1️Sign in using Supabase Auth
+        # Sign in using Supabase Auth
         auth_response = supabase.auth.sign_in_with_password({
             "email": login.email,
             "password": login.password

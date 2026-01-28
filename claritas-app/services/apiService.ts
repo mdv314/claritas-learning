@@ -1,5 +1,5 @@
 // services/apiService.ts
-import { PreferenceProfile, UserInformation } from "../types";
+import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse } from "../types";
 
 const API_BASE_URL = "http://127.0.0.5000";
 
@@ -40,4 +40,24 @@ export const createUser = async (user: UserInformation): Promise<any> => {
     }
 
     return response.json();
+}
+
+export const loginUser = async (loginAttempt: LoginInfo): Promise<AuthResponse> => {
+    console.log(loginAttempt)
+    const response = await fetch('http://127.0.0.1:5000/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json', // <-- important
+        },
+        body: JSON.stringify(loginAttempt),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+
+    const data: AuthResponse = await response.json();
+    console.log("Login response:", data);
+
+    return data;
 }
