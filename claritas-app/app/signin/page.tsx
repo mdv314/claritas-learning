@@ -54,26 +54,28 @@ const SignInPage: React.FC<Props> = ({ onComplete }) => {
     setError(null);
     setIsLoading(true);
 
-    if (mode === 'signup' && formData.password !== passwordCheck) {
-      setError("Passwords don't match");
-      setIsLoading(false);
-      return;
-    }
+    if (mode === 'signup') {
+      if (formData.password !== passwordCheck) {
+        setError("Passwords don't match");
+        setIsLoading(false);
+        return;
+      }
 
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
-      setIsLoading(false);
-      return;
-    }
+      if (formData.password.length < 6) {
+        setError("Password must be at least 6 characters");
+        setIsLoading(false);
+        return;
+      }
 
-    try {
-      onComplete(createUser(formData));
-      setSuccess(true);
-      console.log('Authentication successful:', { mode, email: formData.email });
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
+      try {
+        onComplete(createUser(formData));
+        setSuccess(true);
+        console.log('Authentication successful:', { mode, email: formData.email });
+      } catch (err) {
+        setError("An unexpected error occurred. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 

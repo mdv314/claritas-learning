@@ -228,59 +228,95 @@ async def generate_topic(request: TopicRequest):
 # USER-RELATED FUNCTIONS #
 class User(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     password: str
 
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "name": "Alice",
                 "email": "alice@example.com",
                 "password": "securePassword123"
             }
         }
+    }
 
 @app.post("/create_user")
 def create_user(user: User):
     try:
-        # 1️⃣ Check if email already exists in Supabase Auth
+        # Check if email exists
         try:
             existing_user = supabase.auth.api.get_user_by_email(user.email)
-        except Exception as e:
-            existing_user = None  # If Supabase API throws for not found, ignore
-
+        except Exception:
+            existing_user = None  # Supabase may fail if maintenance
         if existing_user is not None:
             raise HTTPException(status_code=400, detail="Email is already registered")
 
-        # 2️⃣ Create user in Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            "email": user.email,
-            "password": user.password
-        })
+        # Create user in Supabase Auth
+        try:
+            auth_response = supabase.auth.sign_up({
+                "email": user.email,
+                "password": user.password
+            })
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Supabase service unavailable: {str(e)}")
 
         if auth_response.user is None:
             raise HTTPException(status_code=400, detail="Auth signup failed")
 
         user_id = auth_response.user.id
 
-        # 3️⃣ Insert profile info into users table
-        db_response = supabase.table("users").insert({
-            "id": user_id,
-            "name": user.name,
-            "email": user.email
-        }).execute()
+        # Insert profile info into users table
+        try:
+            db_response = supabase.table("users").insert({
+                "id": user_id,
+                "name": user.name,
+                "email": user.email
+            }).execute()
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Supabase DB unavailable: {str(e)}")
 
         if db_response.error:
             raise HTTPException(status_code=500, detail=db_response.error.message)
 
-        # 4️⃣ Return success
         return {"message": "User created successfully", "data": db_response.data}
 
     except HTTPException:
-        raise  # Re-raise known HTTP exceptions
+        raise
     except Exception as e:
-        # Catch-all for unexpected errors
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+@app.post("/login")
+def login(login: LoginRequest):
+    try:
+        # 1️Sign in using Supabase Auth
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": login.email,
+            "password": login.password
+        })
+
+        # Check if login was successful
+        if auth_response.user is None:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Return the access token to the frontend
+        access_token = auth_response.session.access_token
+        refresh_token = auth_response.session.refresh_token
+
+        return {
+            "message": "Login successful",
+            "user_id": auth_response.user.id,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
+
+    except Exception as e:
+        # Handles network or Supabase errors
+        raise HTTPException(status_code=503, detail=f"Supabase service unavailable: {str(e)}")
 
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=5000)
