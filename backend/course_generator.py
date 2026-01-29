@@ -45,6 +45,27 @@ class TopicContent(BaseModel):
     sections: List[TopicSection] = Field(description="Content sections")
     quiz: List[QuizQuestion] = Field(description="Quiz questions for this topic")
 
+class FreeResponseQuestion(BaseModel):
+    question: str = Field(description="The free response question prompt")
+    sampleAnswer: str = Field(description="A complete sample correct answer")
+    keyPoints: List[str] = Field(description="Key points that should be covered in a good answer")
+    maxPoints: int = Field(default=3, description="Maximum points for this question")
+
+class ModuleQuizContent(BaseModel):
+    title: str = Field(description="Title of the module quiz")
+    multipleChoice: List[QuizQuestion] = Field(description="Multiple choice questions (8-12)")
+    freeResponse: List[FreeResponseQuestion] = Field(description="Free response questions (2-3)")
+
+class FRQEvaluation(BaseModel):
+    questionIndex: int = Field(description="Index of the free response question (0-based)")
+    score: int = Field(description="Score awarded (0 to maxPoints)")
+    maxPoints: int = Field(description="Maximum possible points")
+    feedback: str = Field(description="Detailed feedback explaining what the student got right or wrong")
+
+class QuizEvaluationResult(BaseModel):
+    frqEvaluations: List[FRQEvaluation] = Field(description="Evaluation for each free response question")
+    overallFeedback: str = Field(description="Overall feedback on the student's performance")
+
 class CourseGenerator:
     def __init__(self):
         try:
@@ -141,4 +162,78 @@ class CourseGenerator:
                 raise ValueError("Empty response from Gemini")
         except Exception as e:
             print(f"Error generating topic content: {e}")
+            return {"error": str(e)}
+
+    def _load_module_quiz_prompt(self) -> str:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'module_quiz.txt')
+        with open(prompt_path, 'r') as f:
+            return f.read()
+
+    def generate_module_quiz(self, course_title: str, unit_title: str, unit_description: str,
+                            subtopics: List[str], skill_level: str, age_group: str) -> Dict[str, Any]:
+        system_template = self._load_module_quiz_prompt()
+        formatted_prompt = system_template.format(
+            course_title=course_title,
+            unit_title=unit_title,
+            unit_description=unit_description,
+            subtopics="\n".join(f"- {s}" for s in subtopics),
+            skill_level=skill_level,
+            age_group=age_group
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[formatted_prompt],
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': ModuleQuizContent
+                }
+            )
+            if response.text:
+                return json.loads(response.text)
+            else:
+                raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            print(f"Error generating module quiz: {e}")
+            return {"error": str(e)}
+
+    def _load_quiz_evaluation_prompt(self) -> str:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'quiz_evaluation.txt')
+        with open(prompt_path, 'r') as f:
+            return f.read()
+
+    def evaluate_module_quiz(self, frq_questions: List[Dict], frq_answers: List[str],
+                            skill_level: str, age_group: str) -> Dict[str, Any]:
+        system_template = self._load_quiz_evaluation_prompt()
+
+        questions_text = ""
+        for i, (q, ans) in enumerate(zip(frq_questions, frq_answers)):
+            questions_text += f"\n--- Question {i+1} (Max {q['maxPoints']} points) ---\n"
+            questions_text += f"Question: {q['question']}\n"
+            questions_text += f"Sample Answer: {q['sampleAnswer']}\n"
+            questions_text += f"Key Points: {', '.join(q['keyPoints'])}\n"
+            questions_text += f"Student's Answer: {ans}\n"
+
+        formatted_prompt = system_template.format(
+            questions_text=questions_text,
+            skill_level=skill_level,
+            age_group=age_group
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[formatted_prompt],
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': QuizEvaluationResult
+                }
+            )
+            if response.text:
+                return json.loads(response.text)
+            else:
+                raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            print(f"Error evaluating quiz: {e}")
             return {"error": str(e)}
