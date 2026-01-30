@@ -1,99 +1,222 @@
+'use client'
+import { useState } from 'react';
+import { 
+  Sparkles, 
+  MapPin, 
+  BrainCircuit, 
+  Zap, 
+  ArrowRight, 
+  CheckCircle2,
+  Globe
+} from 'lucide-react';
 import Link from 'next/link';
 
-export default function Home() {
+export default function HomePage() {
+  const [selectedState, setSelectedState] = useState('California');
+  const states = ['California', 'Texas', 'New York', 'Florida', 'Washington'];
+
+  const curriculumData: Record<string, string[]> = {
+    'California': ['NGSS Standards', 'Emphasis on Climate Science', 'Critical Thinking Framework'],
+    'Texas': ['TEKS Alignment', 'Strong STEM Foundation', 'Applied Technical Skills'],
+    'New York': ['Regents Mastery', 'Humanities Depth', 'Data Analysis Focus'],
+    'Florida': ['BEST Standards', 'Civics Integration', 'Practical Literacy'],
+    'Washington': ['Environmental Tech', 'Coding Integration', 'Social-Emotional Learning']
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <header className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-600/20">
-            C
-          </div>
-          <span className="font-bold text-xl tracking-tight text-gray-900">Claritas Learning</span>
-        </div>
-        <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-500">
-          <Link href="/" className="text-gray-900">Home</Link>
-          <Link href="/generate" className="hover:text-blue-600 transition-colors">Create Course</Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">Library</Link>
-        </nav>
-        <div className="flex gap-4">
-          <Link href="/generate">
-            <button className="px-6 py-2.5 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
-              Get Started
-            </button>
-          </Link>
-        </div>
-      </header>
-
+    <div className="min-h-screen w-full bg-slate-50 overflow-x-hidden">
       {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-8 pt-20 pb-32">
-        <div className="flex flex-col md:flex-row items-center gap-16">
-          <div className="flex-1 space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              Now with Gemini 3 AI
-            </div>
+      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-indigo-200 rounded-full filter blur-3xl opacity-40 animate-pulse"></div>
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-100 rounded-full filter blur-3xl opacity-40 animate-pulse delay-700"></div>
+        </div>
 
-            <h1 className="text-6xl font-bold text-gray-900 tracking-tight leading-tight">
-              Learn anything <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                your heart desires.
-              </span>
-            </h1>
-
-            <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
-              Claritas Learning uses advanced AI to generate comprehensive, personalized course plans for any topic, age, or skill level.
-            </p>
-
-            <div className="flex gap-4 pt-4">
-              <Link href="/generate">
-                <button className="px-8 py-4 rounded-xl bg-gray-900 text-white font-bold text-lg hover:bg-black transition-all hover:scale-105 active:scale-95 duration-200">
-                  Start Learning Now
-                </button>
-              </Link>
-              <button className="px-8 py-4 rounded-xl bg-gray-100 text-gray-900 font-bold text-lg hover:bg-gray-200 transition-all">
-                View Demo
-              </button>
-            </div>
-
-            <div className="pt-8 flex items-center gap-4 text-sm text-gray-500">
-              <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className={`w-8 h-8 rounded-full border-2 border-white bg-gray-${i * 200} bg-gradient-to-br from-gray-200 to-gray-400`} />
-                ))}
-              </div>
-              <p>Trusted by 10,000+ learners</p>
-            </div>
+        <div className="max-w-7xl mx-auto relative z-10 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-sm font-bold mb-8 animate-fade-in">
+            <Sparkles size={16} />
+            <span>Powered by Gemini 3.0</span>
           </div>
+          
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.1] mb-8">
+            The Classroom of <br />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-500">
+              One.
+            </span>
+          </h1>
+          
+          <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-600 font-medium mb-12 leading-relaxed">
+            Claritas uses advanced AI to build custom courses tailored to your interests, 
+            while automatically aligning every lesson to your state's specific educational standards.
+          </p>
 
-          <div className="flex-1 relative">
-            <div className="absolute top-0 right-0 -z-10 bg-gradient-to-bl from-blue-100 to-purple-100 rounded-full blur-3xl w-[120%] h-[120%] opacity-60 transform translate-x-20 -translate-y-20"></div>
-            <div className="relative bg-white/50 backdrop-blur-xl border border-white/50 p-6 rounded-3xl shadow-2xl transform rotate-3 hover:rotate-0 transition-all duration-500">
-              {/* Abstract UI representation of a course card */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-                <div className="h-48 rounded-xl bg-gray-100 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 opacity-10"></div>
-                  <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur rounded-lg p-3">
-                    <div className="h-2 w-24 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-2 w-16 bg-gray-200 rounded"></div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link 
+              href="/generate"
+              className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 hover:shadow-2xl hover:shadow-indigo-200 transition-all active:scale-95"
+            >
+              Generate Your Course
+              <ArrowRight size={20} />
+            </Link>
+            <button className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all">
+              Watch Demo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Section: State Curriculum Alignment */}
+      <section className="py-20 bg-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="order-2 lg:order-1">
+              <div className="glass p-8 rounded-[2.5rem] border-slate-100 shadow-xl relative">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg">
+                      <MapPin size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">State Selector</h3>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Curriculum Bridge</p>
+                    </div>
+                  </div>
+                  <select 
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {states.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <BrainCircuit className="text-indigo-600" size={18} />
+                      <span className="text-sm font-bold text-indigo-900">Gemini Adaptation Logic</span>
+                    </div>
+                    <p className="text-sm text-indigo-700 font-medium italic">
+                      "Re-mapping 'The Great Depression' lesson plan to meet {selectedState} {curriculumData[selectedState][0]}..."
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    {curriculumData[selectedState].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm animate-fade-in">
+                        <CheckCircle2 className="text-emerald-500" size={18} />
+                        <span className="text-sm font-bold text-slate-700">{item}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="h-4 w-3/4 bg-gray-900 rounded opacity-10"></div>
-                  <div className="h-4 w-1/2 bg-gray-900 rounded opacity-10"></div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <div className="h-8 w-20 bg-blue-100 rounded-lg"></div>
-                  <div className="h-8 w-20 bg-purple-100 rounded-lg"></div>
+
+                <div className="mt-8 p-4 rounded-2xl bg-slate-900 text-white text-sm font-mono overflow-hidden">
+                  <div className="flex gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                  </div>
+                  <div className="text-emerald-400">// API response: status 200</div>
+                  <div className="text-slate-300">"Aligned curriculum generated for {selectedState}"</div>
                 </div>
               </div>
             </div>
+
+            <div className="order-1 lg:order-2">
+              <h2 className="text-4xl font-black text-slate-900 mb-6 leading-tight">
+                Curriculum that follows <br />
+                <span className="text-emerald-600">your laws.</span>
+              </h2>
+              <p className="text-lg text-slate-600 font-medium mb-8 leading-relaxed">
+                Most AI learning tools provide generic content. Claritas is different. 
+                Our specialized bridge connects the Gemini API to every state’s educational standards 
+                in real-time, ensuring what you learn is recognized by your local district.
+              </p>
+              <ul className="space-y-4">
+                {[
+                  '100% Alignment with Common Core & NGSS',
+                  'Localized content for all 50 US States',
+                  'Dynamic difficulty scaling',
+                  'Teacher-verified pedagogy'
+                ].map((text, i) => (
+                  <li key={i} className="flex items-center gap-3 font-bold text-slate-700">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <Zap size={14} className="text-emerald-600" />
+                    </div>
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
-      </main>
+      </section>
+
+      {/* Trust / Stats Section */}
+      <section className="py-20 bg-indigo-900 text-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-black mb-2">10k+</div>
+              <div className="text-indigo-200 font-bold uppercase tracking-widest text-xs">Active Courses</div>
+            </div>
+            <div>
+              <div className="text-4xl font-black mb-2">50/50</div>
+              <div className="text-indigo-200 font-bold uppercase tracking-widest text-xs">States Covered</div>
+            </div>
+            <div>
+              <div className="text-4xl font-black mb-2">98%</div>
+              <div className="text-indigo-200 font-bold uppercase tracking-widest text-xs">Approval Rate</div>
+            </div>
+            <div>
+              <div className="text-4xl font-black mb-2">2s</div>
+              <div className="text-indigo-200 font-bold uppercase tracking-widest text-xs">Generation Time</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer CTA */}
+      <section className="py-32 px-6">
+        <div className="max-w-4xl mx-auto glass p-12 md:p-20 rounded-[3rem] text-center border-indigo-100 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 text-indigo-100 opacity-20">
+            <Globe size={200} strokeWidth={1} />
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-8 relative z-10">
+            Ready to learn <br />without limits?
+          </h2>
+          <p className="text-slate-600 text-lg font-medium mb-10 max-w-lg mx-auto relative z-10">
+            Join thousands of students who have discovered the power of personalized, 
+            AI-driven education.
+          </p>
+          <Link 
+            href='/generate'
+            className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 hover:scale-105 transition-all shadow-xl shadow-indigo-200 relative z-10"
+          >
+            Start Your First Course
+          </Link>
+        </div>
+      </section>
+
+      <footer className="py-12 border-t border-slate-200 bg-white">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+              <Sparkles size={16} />
+            </div>
+            <span className="font-black text-xl text-slate-800 tracking-tighter">Claritas</span>
+          </div>
+          <div className="flex gap-8 text-sm font-bold text-slate-400 uppercase tracking-widest">
+            <a href="#" className="hover:text-indigo-600 transition-colors">Privacy</a>
+            <a href="#" className="hover:text-indigo-600 transition-colors">Terms</a>
+            <a href="#" className="hover:text-indigo-600 transition-colors">Contact</a>
+          </div>
+          <p className="text-slate-400 text-sm font-medium">
+            © 2025 Claritas Learning. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };

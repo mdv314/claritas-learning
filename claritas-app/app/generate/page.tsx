@@ -54,7 +54,7 @@ const Header = () => (
 const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, isLoading: boolean }) => {
     const [topic, setTopic] = useState('');
     const [skillLevel, setSkillLevel] = useState('Beginner');
-    const [ageGroup, setAgeGroup] = useState('Adult');
+    const [ageGroup, setAgeGroup] = useState('Adult (18+)');
     const [notes, setNotes] = useState('');
     const [materials, setMaterials] = useState('');
     const [file, setFile] = useState<File | null>(null);
@@ -113,10 +113,10 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                             value={ageGroup}
                             onChange={(e) => setAgeGroup(e.target.value)}
                         >
-                            <option>Child (5-10)</option>
-                            <option>Teen (11-17)</option>
-                            <option>Adult (18+)</option>
-                            <option>Senior</option>
+                            <option value="Child">Child (5-10)</option>
+                            <option value="Teen">Teen (11-17)</option>
+                            <option value="Adult">Adult (18+)</option>
+                            <option value="Senior">Senior</option>
                         </select>
                     </div>
                 </div>
