@@ -26,18 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 try:
     genai_client = genai.Client()
 except Exception as e:
     print(f"Error configuring Gemini client: {e}")
     # Continue execution, but warn
     print("Please ensure your GEMINI_API_KEY is set in your .env file or environment variables.")
-
-supabase: Client = create_client(
-    os.environ.get("SUPABASE_URL"),
-    os.environ.get("SUPABASE_KEY")
-)
-
+    
 # Initialize CourseGenerator
 course_generator = CourseGenerator()
 
@@ -225,7 +221,9 @@ async def generate_topic(request: TopicRequest):
         print(f"Error in generate_topic: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+##########################
 # USER-RELATED FUNCTIONS #
+##########################
 class User(BaseModel):
     name: str
     email: EmailStr
@@ -244,40 +242,41 @@ class User(BaseModel):
 @app.post("/create_user")
 def create_user(user: User):
     try:
-        # Check if email exists
+        # 1️⃣ Check if email already exists in Supabase Auth
         try:
-            existing_user = supabase.auth.api.get_user_by_email(user.email)
-        except Exception:
-            existing_user = None  # Supabase may fail if maintenance
-        if existing_user is not None:
-            raise HTTPException(status_code=400, detail="Email is already registered")
+            existing_user = supabase.auth.admin.get_user_by_email(user.email)
+            if existing_user:
+                raise {"message": "User created successfully", "data": 'email'}
+        except Exception as e:
+            # Supabase may throw if user does not exist; ignore that
+            pass
 
-        # Create user in Supabase Auth
         try:
-            auth_response = supabase.auth.sign_up({
+            auth_response = supabase.auth.admin.create_user({
                 "email": user.email,
-                "password": user.password
+                "password": user.password,
+                "email_confirm": True  # Automatically confirm email
             })
         except Exception as e:
             raise HTTPException(status_code=503, detail=f"Supabase service unavailable: {str(e)}")
 
-        if auth_response.user is None:
+        if not auth_response or not hasattr(auth_response, "user") or not auth_response.user:
             raise HTTPException(status_code=400, detail="Auth signup failed")
 
         user_id = auth_response.user.id
 
-        # Insert profile info into users table
-        try:
-            db_response = supabase.table("users").insert({
-                "id": user_id,
-                "name": user.name,
-                "email": user.email
-            }).execute()
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Supabase DB unavailable: {str(e)}")
+        # 3️⃣ Insert profile info into your users table
+        db_response = supabase.table("users").insert({
+            "auth_id": user_id,
+            "name": user.name,
+            "email": user.email
+        }).execute()
 
-        if db_response.error:
-            raise HTTPException(status_code=500, detail=db_response.error.message)
+        # 4️⃣ Check for DB errors
+        if hasattr(db_response, 'error') and db_response.error:
+            raise HTTPException(status_code=500, detail=str(db_response.error))
+
+        print("Inserted data:", db_response.data)
 
         return {"message": "User created successfully", "data": db_response.data}
 
@@ -285,6 +284,7 @@ def create_user(user: User):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
