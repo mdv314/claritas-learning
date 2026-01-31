@@ -48,12 +48,15 @@ export default function SignUpForm() {
         }
         
         if (signUpData.password.length < 6) {
-            setError('Password length must be at least 6 characters.')
+          setError('Password length must be at least 6 characters.')
+          setIsLoading(false);
+          return;
         }
 
         try {
           const result = await createUser(signUpData)
-          console.log('Authentication successful:', { mode: 'login', email: result.user_id });
+          console.log()
+          console.log('Authentication successful:', { mode: 'signup', email: result });
           const accessToken = "your-jwt-here";
           const expires = new Date();
           expires.setHours(expires.getHours() + 6);
