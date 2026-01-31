@@ -23,6 +23,18 @@ class Questions(BaseModel):
     subject: str
     questions: List[Question]
 
+class Result(BaseModel):
+    question: str
+    answer: str
+    isCorrect: bool
+
+class CalibrationResult(BaseModel):
+    score: int = 0
+    masteryLevel: str = 'Beginner'
+    strengths: List[str]
+    weaknesses: List[str]
+    recommendation: str
+
 # --- Assessment Generator ---
 class AssessmentGenerator:
     """Generate self-assessment questions using Gemini 3 Preview."""
@@ -35,22 +47,19 @@ class AssessmentGenerator:
             print(f"Error initializing Gemini client: {e}")
             raise e
 
-    def _load_prompt(self) -> str:
-        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'assessment_content.txt')
+    def _load_prompt(self, filename) -> str:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', filename)
         with open(prompt_path, 'r') as f:
             return f.read()
 
     def generate_questions(self, subject: str, grade_level: str) -> list[Question]:
-        system_template = self._load_prompt()
+        system_template = self._load_prompt('assessment_content.txt')
         
         # Format the prompt with user inputs
         formatted_prompt = system_template.format(
             subject=subject,
             grade_level=grade_level
         )
-
-
-        print(formatted_prompt)
 
         try:
             response = self.client.models.generate_content(
@@ -71,56 +80,41 @@ class AssessmentGenerator:
             print(f"Error generating quiz: {e}")
             return {"error": str(e)}
 
-        response_text = response.text.strip()
-        print(response)
-        # Clean code blocks
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        elif response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
+    def evaluate_quiz(self, subject: str, grade_level: str, results_input: List[dict]) -> List[Result]:
+        """
+        Evaluate a student's quiz answers using AI.
+        
+        Args:
+            subject: Subject of the quiz
+            grade_level: Grade level
+            results_input: List of dicts, each with question, options, and student's answer
 
-        # Parse JSON safely
+        Returns:
+            List[Result]: Validated AI evaluation results
+        """
+        system_template = self._load_prompt('result_content.txt')
+
+        # Replace placeholders in prompt
+        formatted_prompt = system_template.format(subject=subject, grade_level=grade_level)
+
         try:
-            data = json.loads(response_text)
-        except json.JSONDecodeError:
-            import ast
-            data = ast.literal_eval(response_text)
-
-        # Convert to Question objects
-        return [
-            Question(
-                id=f"q{i+1}",
-                question=q,
-                options=[],
-                correctAnswer="",
-                explanation="",
-                difficulty="Easy"
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[formatted_prompt],
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': CalibrationResult
+                }
             )
-            for i, q in enumerate(data.get("questions", []))
-        ]
-
-    def _validate_response(self, response: dict) -> bool:
-        """Validate structure of response."""
-        required_keys = {"subject", "grade_level", "questions"}
-        if not all(k in response for k in required_keys):
-            return False
-        questions = response["questions"]
-        if not isinstance(questions, list) or len(questions) != 10:
-            return False
-        for q in questions:
-            keys = {"id", "question", "options", "correctAnswer", "difficulty", "explanation"}
-            if not all(k in q for k in keys):
-                return False
-            if not isinstance(q["options"], list) or len(q["options"]) != 4:
-                return False
-            if q["correctAnswer"] not in q["options"]:
-                return False
-            if q["difficulty"] not in ["Easy", "Medium", "Hard"]:
-                return False
-        return True
+            
+            if response.text:
+                # print("DEBUG: Gemini Topic Response:", response.text)
+                return json.loads(response.text)
+            else:
+                raise ValueError("Empty response from Gemini")
+        except Exception as e:
+            print(f"Error generating quiz: {e}")
+            return {"error": str(e)}
 
     def save_to_file(self, questions: dict, filename: str = "assessment.json"):
         with open(filename, "w", encoding="utf-8") as f:

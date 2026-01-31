@@ -1,0 +1,24 @@
+You are an expert educator.
+
+Evaluate a student's quiz submission for {subject} (Grade {grade_level}).
+
+The student has answered 10 questions. For each question, you have the following information:
+- question text
+- student's answer
+- 4 answer options
+- the correct answer
+
+Your task:
+- Determine if the student's answer is correct.
+- Provide a short explanation for each question.
+- Return ONLY valid JSON — no code blocks, no markdown, no extra text.
+- Format the JSON as a list of results, where each result has:
+  - "question": the original question text
+  - "answer": the student's answer
+  - "isCorrect": true or false
+  - "correctAnswer": the correct answer
+  - "explanation": a short explanation of the correct answer
+
+Replace {subject} and {grade_level} with the actual values.
+
+Return the full JSON object only, nothing else.

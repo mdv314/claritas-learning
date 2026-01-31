@@ -80,6 +80,26 @@ export const generateAssessmentQuestions = async (grade: GradeLevel, subject: Su
     return response.json();
 }
 
-export const evaluateAssessment = async (grade: GradeLevel, subject: Subject, finalScore: Result[]):  Promise<any> => {
-    
+interface QuizAttempt {
+    gradeLevel: GradeLevel;
+    subject: Subject;
+    results: Result[];
+}
+
+export const evaluateAssessment = async (grade: GradeLevel, subject: Subject, results: Result[]):  Promise<any> => {
+    const attempt: QuizAttempt = { gradeLevel: grade, subject: subject, results: results }
+
+    const response = await fetch(`${API_BASE_URL}/evaluate_assessment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(attempt),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+
+    return response.json();
 }

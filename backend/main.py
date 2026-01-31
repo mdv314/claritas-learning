@@ -246,6 +246,13 @@ class QuizAttempt(BaseModel):
     subject: str = 'Chemistry'
     results: List[Result]
 
+class CalibrationResult(BaseModel):
+    score: int = 0
+    masteryLevel: str = 'Beginner'
+    strengths: List[str]
+    weaknesses: List[str]
+    recommendation: str
+
 
 @app.post("/generate_assessment")
 def generate_assessment(selectedOptions: SelectedOptions):
@@ -262,7 +269,24 @@ def generate_assessment(selectedOptions: SelectedOptions):
 
 @app.post("/evaluate_assessment")
 def evaluate_assessment(quiz_attempt: QuizAttempt):
-    return
+    # Call the AI evaluation method
+    # This method should return a dictionary matching CalibrationResult fields
+    evaluation = assessment_generator.evaluate_quiz(
+        subject=quiz_attempt.subject,
+        grade_level=quiz_attempt.gradeLevel,
+        results_input=[r.dict() for r in quiz_attempt.results]
+    )
+
+    # AI should return a dict like:
+    # {
+    #   "score": 80,
+    #   "masteryLevel": "Intermediate",
+    #   "strengths": ["Question X", ...],
+    #   "weaknesses": ["Question Y", ...],
+    #   "recommendation": "Focus on ..."
+    # }
+
+    return CalibrationResult(**evaluation)
 
 ##########################
 # USER-RELATED FUNCTIONS #
