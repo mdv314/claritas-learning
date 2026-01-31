@@ -51,6 +51,11 @@ export type Subject =
   | 'Mathematics' | 'Geometry' | 'Algebra' | 'Science' | 'Biology' 
   | 'Physics' | 'History' | 'Literature' | 'Computer Science';
 
+export interface AssessmentSubmission {
+    subject: Subject;
+    gradeLevel: GradeLevel;
+}
+
 export interface Question {
   id: string;
   question: string;

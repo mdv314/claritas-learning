@@ -1,5 +1,5 @@
 // services/apiService.ts
-import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse } from "../types";
+import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, AssessmentSubmission } from "../types";
 
 const API_BASE_URL = "http://127.0.0.5000";
 
@@ -60,4 +60,8 @@ export const loginUser = async (loginAttempt: LoginInfo): Promise<AuthResponse> 
     console.log("Login response:", data);
 
     return data;
+}
+
+export const generateAssessment = async (info: AssessmentSubmission): Promise<any> => {
+
 }
