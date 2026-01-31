@@ -1,6 +1,6 @@
 // services/apiService.ts
 import { useState } from "react";
-import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, GradeLevel, Subject, AssessmentSubmission } from "../types";
+import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, GradeLevel, Subject, AssessmentSubmission, Question } from "../types";
 
 const API_BASE_URL = "http://127.0.0.1:5000";
 
@@ -63,7 +63,7 @@ export const loginUser = async (loginAttempt: LoginInfo): Promise<AuthResponse> 
     return data;
 }
 
-export const generateAssessmentQuestions = async (grade: GradeLevel, subject: Subject): Promise<any> => {
+export const generateAssessmentQuestions = async (grade: GradeLevel, subject: Subject): Promise<Question[]> => {
     const submission: AssessmentSubmission = { subject: subject, gradeLevel: grade }
     const response = await fetch(`${API_BASE_URL}/generate_assessment`, {
         method: 'POST',

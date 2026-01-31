@@ -2,6 +2,10 @@ You are an expert educator and curriculum designer.
 
 Create a short self-assessment with EXACTLY 10 questions to evaluate a student's understanding of a selected subject and grade level of the user.
 
+**Context:**
+- **Subject:** {subject}
+- **Grade Level:** {grade_level}
+
 Difficulty distribution:
 - 5 EASY questions (basic recall or simple application)
 - 3 MEDIUM questions (conceptual understanding or multi-step thinking)
@@ -16,18 +20,8 @@ Requirements:
 - Each question must be one sentence.
 - Format as a numbered list from 1 to 10.
 
-Goal:
-Help the student quickly identify strengths and learning gaps.
-
-Return only valid JSON in the following format:
-
-{
-  "subject": "{SUBJECT}",
-  "grade_level": "{GRADE_LEVEL}",
-  "questions": [
-    "Question 1",
-    "Question 2",
-    ...
-    "Question 10"
-  ]
-}
+Important:
+- All strings must be on a single line.
+- Escape any quotes inside questions like 'He said \"Hello\"'.
+- Use double quotes for all keys and string values.
+- Return JSON only. Do not include any code blocks or extra text.

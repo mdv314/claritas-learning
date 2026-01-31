@@ -62,7 +62,6 @@ export interface Question {
   options: string[];
   correctAnswer: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
-  explanation: string;
 }
 
 export interface AssessmentData {

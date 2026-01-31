@@ -11,6 +11,7 @@ from typing import Optional, List
 from google import genai
 from dotenv import load_dotenv
 from course_generator import CourseGenerator
+from assessment_generator import AssessmentGenerator
 from database import supabase
 
 load_dotenv()
@@ -33,8 +34,9 @@ except Exception as e:
     # Continue execution, but warn
     print("Please ensure your GEMINI_API_KEY is set in your .env file or environment variables.")
     
-# Initialize CourseGenerator
+# Initialize generators
 course_generator = CourseGenerator()
+assessment_generator = AssessmentGenerator()
 
 # Directory to store course plans locally
 COURSE_PLANS_DIR = os.path.join(os.path.dirname(__file__), "course_plans")
@@ -222,10 +224,26 @@ class SelectedOptions(BaseModel):
     gradeLevel: str = '4th Grade'
     subject: str = 'Chemistry'
 
-@app.post('/generate_assessment')
+class Question(BaseModel):
+    id: str
+    question: str
+    options: list
+    correctAnswer: str
+    difficulty: str = 'Easy'
+
+#@app.post("/generate_assessment", response_model=List[Question])
+@app.post("/generate_assessment")
 def generate_assessment(selectedOptions: SelectedOptions):
-    print(selectedOptions)
-    return { 'success': True }
+    # Generate the full assessment dict
+    questions_list = assessment_generator.generate_questions(
+        subject=selectedOptions.subject,
+        grade_level=selectedOptions.gradeLevel
+    )
+    
+    print(questions_list)
+
+    # Return as list of Pydantic Question models
+    return {'success': True}
 
 ##########################
 # USER-RELATED FUNCTIONS #
