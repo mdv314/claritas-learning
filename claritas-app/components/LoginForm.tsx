@@ -33,12 +33,6 @@ export default function LoginForm() {
 
         try {
           const result = await loginUser(loginData)
-          console.log('Authentication successful:', { mode: 'login', email: result.user_id });
-          const accessToken = "your-jwt-here";
-          const expires = new Date();
-          expires.setHours(expires.getHours() + 6);
-
-          document.cookie = `access_token=${accessToken}; expires=${expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax; path=/`;
           setSuccess(true);
         } catch (err) {
             setError("An unexpected error occurred. Please try again.");

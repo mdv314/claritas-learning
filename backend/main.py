@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from pydantic import BaseModel, EmailStr
@@ -358,7 +358,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/login")
-def login(login: LoginRequest):
+def login(response: Response, login: LoginRequest):
     try:
         # Sign in using Supabase Auth
         auth_response = supabase.auth.sign_in_with_password({
@@ -370,15 +370,20 @@ def login(login: LoginRequest):
         if auth_response.user is None:
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        # Return the access token to the frontend
         access_token = auth_response.session.access_token
         refresh_token = auth_response.session.refresh_token
 
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=60 * 60 * 6
+        )
+        
         return {
-            "message": "Login successful",
-            "user_id": auth_response.user.id,
-            "access_token": access_token,
-            "refresh_token": refresh_token
+            "message": "Login successful"
         }
 
     except Exception as e:

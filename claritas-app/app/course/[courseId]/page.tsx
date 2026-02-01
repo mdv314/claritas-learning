@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { redirect, useParams } from 'next/navigation';
 import { CourseView } from '@/components/CourseView';
+import { cookies } from 'next/headers';
 
 interface Quiz {
     title: string;
