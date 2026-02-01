@@ -48,15 +48,15 @@ interface CourseDashboardProps {
         redirect('/sign-in')
     }
     return (
-        <div className="space-y-8">
-          <div className="flex justify-between items-end">
+        <div className="flex flex-col justify-center p-85 space-y-8 justify-center h-screen">
+          <div className="flex justify-between items-end border-b border-slate-200 pb-6">
             <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Your Learning Paths</h2>
-              <p className="text-slate-500 mt-1">Pick up where you left off or start a new calibration.</p>
+              <h2 className="text-4xl font-black text-slate-900 tracking-tight">My Dashboard</h2>
+              <p className="text-slate-500 mt-2 font-medium">Manage your personalized learning paths and progress.</p>
             </div>
             <button
               onClick={onAddNew}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all flex items-center space-x-2"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
