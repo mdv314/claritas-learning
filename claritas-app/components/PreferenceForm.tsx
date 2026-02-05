@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+'use client'
+import React, { useEffect, useState } from 'react';
 import { 
   UserRole, 
   EducationLevel, 
@@ -13,6 +14,7 @@ import {
   STUDENT_TRAITS
 } from '../constants';
 import { ChevronLeft, ChevronRight, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Props {
     onComplete: (data: any) => void; 
@@ -34,10 +36,26 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
     });
     const [loading, setLoading] = useState(false);
     const [customSubject, setCustomSubject] = useState('');
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+    const router = useRouter();
 
-    const totalSteps = 5;
+    const totalSteps = 4;
     const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps + 1));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+
+    useEffect(() => {
+        const fetchSession = async () => {
+          try {
+            const res = await fetch('/api/auth', { credentials: 'include' });
+            const data = await res.json();
+            setIsAuthenticated(data.authenticated);
+          } catch {
+            setIsAuthenticated(false);
+          }
+        };
+    
+        fetchSession();
+      }, [setIsAuthenticated])
 
     const toggleTrait = (trait: string) => {
         setProfile(prev => ({
@@ -74,19 +92,25 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
             formData.append('materials_text', `Weaknesses to address: ${profile.weaknesses.join(', ')}`);
 
             // 2. Make the API Call to your FastAPI server (Port 5000)
-            const response = await fetch('http://127.0.0.1:5000/generate_course', {
-                method: 'POST',
-                // Fetch automatically handles multipart/form-data boundary when passing FormData
-                body: formData,
-            });
+            if (isAuthenticated) {
+                const response = await fetch('http://127.0.0.1:5000/generate_course', {
+                    method: 'POST',
+                    // Fetch automatically handles multipart/form-data boundary when passing FormData
+                    body: formData,
+                });
 
-            if (!response.ok) {
-                throw new Error(`Server responded with ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("DEBUG: Course Data:", result);
+                onComplete(result);
+            } else {
+                localStorage.setItem("preferences", formData.toString());
+                router.push('/sign-in');
+                alert('Please sign in to generate a course.');
             }
-
-            const result = await response.json();
-            
-            onComplete(result);
         } catch (error) {
             console.error("Course Generation Error:", error);
             alert("The AI engine failed to synthesize your roadmap.");
@@ -357,7 +381,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
                                 </>
                             ) : (
                                 <>
-                                    {step === totalSteps ? 'Generate Course' : 'Continue'}
+                                    {step === totalSteps ? (isAuthenticated ? 'Generate Course' : 'Sign In to Generate Course') : 'Continue'}
                                     <ChevronRight size={18} />
                                 </>
                             )}
