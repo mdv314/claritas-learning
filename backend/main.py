@@ -14,6 +14,7 @@ from course_generator import CourseGenerator
 from assessment_generator import AssessmentGenerator
 from database import supabase
 from fastapi.responses import JSONResponse
+import easyocr
 
 load_dotenv()
 
@@ -38,6 +39,8 @@ except Exception as e:
 # Initialize generators
 course_generator = CourseGenerator()
 assessment_generator = AssessmentGenerator()
+reader = easyocr.Reader(['en'])
+
 
 @app.get("/")
 def root():

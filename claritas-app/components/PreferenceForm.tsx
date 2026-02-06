@@ -39,7 +39,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const router = useRouter();
 
-    const totalSteps = 4;
+    const totalSteps = 5;
     const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps + 1));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
@@ -83,13 +83,9 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
             formData.append('topic', profile.customGoals || `Course for ${profile.grade}`);
             formData.append('skill_level', profile.educationLevel);
             formData.append('age_group', profile.grade);
-            
-            // Contextual data for the AI prompt
-            const contextNotes = `Style: ${profile.learningStyle}. Traits: ${profile.traits.join(', ')}. State: ${profile.state}`;
-            formData.append('additional_notes', contextNotes);
-            
-            // Weaknesses provide the 'materials' or focus areas
-            formData.append('materials_text', `Weaknesses to address: ${profile.weaknesses.join(', ')}`);
+            formData.append('state', profile.state);
+            formData.append('traits', profile.traits.join(','));
+            formData.append('style', profile.learningStyle);
 
             // 2. Make the API Call to your FastAPI server (Port 5000)
             if (isAuthenticated) {
@@ -107,7 +103,12 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
                 console.log("DEBUG: Course Data:", result);
                 onComplete(result);
             } else {
-                localStorage.setItem("preferences", formData.toString());
+                const obj: Record<string, string> = {};
+                formData.forEach((value, key) => {
+                    obj[key] = value.toString();
+                });
+                console.log("DEBUG: Preferences Object:", obj);
+                localStorage.setItem("preferences", JSON.stringify(obj));
                 router.push('/sign-in');
                 alert('Please sign in to generate a course.');
             }
@@ -121,7 +122,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
     };
 
     return (
-        <div className="glass rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100 border border-white/60 max-w-4xl width-100 mx-auto">
+        <div className="glass rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100 border border-white/60 max-w-4xl width-100 mx-auto overflow-y-hidden">
             {/* Steps Progress Header */}
             <div className="px-10 py-8 border-b border-slate-100 bg-white/40 flex items-center justify-between">
                 <div className="flex gap-4">

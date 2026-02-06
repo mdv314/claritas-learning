@@ -42,7 +42,7 @@ const PreferencesPage: React.FC<PreferencesContainerProps> = ({ onBackToHome }) 
 
     // View 2: The Configuration Form (Pathfinder View)
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden height-100">
+        <div className="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden height-100 overflow-y-hidden">
             {/* Background Decorative Elements */}
             <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
                 <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-100/40 rounded-full blur-[120px] animate-pulse"></div>
@@ -52,7 +52,7 @@ const PreferencesPage: React.FC<PreferencesContainerProps> = ({ onBackToHome }) 
             <div className="max-w-7xl mx-auto px-6 pt-32 pb-32 w-full relative z-10">
                 
                 {/* Pathfinder Header Section */}
-                <div className="flex flex-col items-center mb-16 text-center space-y-6">
+                <div className="flex flex-col items-center mb-16 text-center space-y-6 overflow-y-hidden">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] shadow-sm animate-fade-in">
                         <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
