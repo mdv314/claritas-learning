@@ -361,5 +361,136 @@ def create_user(user: User):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
+class ModuleQuizRequest(BaseModel):
+    courseId: str
+    unitNumber: int
+
+@app.post("/generate_module_quiz")
+async def generate_module_quiz(request: ModuleQuizRequest):
+    """Generate or retrieve a cached module-level quiz."""
+    try:
+        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        with open(filepath, 'r', encoding='utf-8') as f:
+            course_data = json.load(f)
+        course_plan = course_data["course_plan"]
+
+        # Check cache
+        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
+        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
+        if os.path.exists(quiz_filepath):
+            with open(quiz_filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+        # Find the unit
+        unit = next((u for u in course_plan.get("units", []) if u.get("unitNumber") == request.unitNumber), None)
+        if not unit:
+            raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
+
+        result = course_generator.generate_module_quiz(
+            course_title=course_plan.get("courseTitle"),
+            unit_title=unit.get("title"),
+            unit_description=unit.get("description", ""),
+            subtopics=unit.get("subtopics", []),
+            skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
+            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
+        )
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        with open(quiz_filepath, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+
+        return result
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in generate_module_quiz: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class EvaluateQuizRequest(BaseModel):
+    courseId: str
+    unitNumber: int
+    mcqAnswers: List[int]
+    frqAnswers: List[str]
+
+@app.post("/evaluate_module_quiz")
+async def evaluate_module_quiz(request: EvaluateQuizRequest):
+    """Evaluate a student's module quiz answers. MCQ scored locally, FRQ scored by Gemini."""
+    try:
+        # Load the quiz
+        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
+        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
+        if not os.path.exists(quiz_filepath):
+            raise HTTPException(status_code=404, detail="Quiz not found. Generate it first.")
+
+        with open(quiz_filepath, 'r', encoding='utf-8') as f:
+            quiz_data = json.load(f)
+
+        # Load course plan for metadata
+        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
+        with open(filepath, 'r', encoding='utf-8') as f:
+            course_data = json.load(f)
+        course_plan = course_data["course_plan"]
+
+        # Score MCQ
+        mcq_questions = quiz_data.get("multipleChoice", [])
+        mcq_score = 0
+        mcq_results = []
+        for i, q in enumerate(mcq_questions):
+            selected = request.mcqAnswers[i] if i < len(request.mcqAnswers) else -1
+            correct = selected == q.get("correctAnswerIndex")
+            if correct:
+                mcq_score += 1
+            mcq_results.append({
+                "question": q["question"],
+                "options": q["options"],
+                "selectedIndex": selected,
+                "correctAnswerIndex": q["correctAnswerIndex"],
+                "explanation": q["explanation"],
+                "correct": correct
+            })
+
+        # Evaluate FRQ via Gemini
+        frq_questions = quiz_data.get("freeResponse", [])
+        eval_result = course_generator.evaluate_module_quiz(
+            frq_questions=frq_questions,
+            frq_answers=request.frqAnswers,
+            skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
+            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
+        )
+        print(f"FRQ Evaluation Result: {eval_result}")
+
+        if "error" in eval_result:
+            raise HTTPException(status_code=500, detail=eval_result["error"])
+
+        # Calculate scores
+        frq_score = sum(e["score"] for e in eval_result.get("frqEvaluations", []))
+        frq_total = sum(q.get("maxPoints", 3) for q in frq_questions)
+
+        return {
+            "mcqResults": mcq_results,
+            "mcqScore": mcq_score,
+            "mcqTotal": len(mcq_questions),
+            "frqEvaluations": eval_result.get("frqEvaluations", []),
+            "frqQuestions": frq_questions,
+            "frqAnswers": request.frqAnswers,
+            "frqScore": frq_score,
+            "frqTotal": frq_total,
+            "totalScore": mcq_score + frq_score,
+            "totalPossible": len(mcq_questions) + frq_total,
+            "overallFeedback": eval_result.get("overallFeedback", "")
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in evaluate_module_quiz: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=5000)

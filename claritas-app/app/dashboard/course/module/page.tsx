@@ -367,10 +367,10 @@ function ModulePageContent() {
                                         <p className="text-sm text-gray-500">{unit.quiz.questionCount} questions</p>
                                     </div>
                                     <button
-                                        className="px-4 py-2 bg-gray-100 text-gray-500 font-medium rounded-lg cursor-not-allowed"
-                                        disabled
+                                        onClick={() => router.push(`/course/quiz?courseId=${courseId}&unitNumber=${unitNumber}`)}
+                                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                                     >
-                                        Coming Soon
+                                        Start Quiz
                                     </button>
                                 </div>
                             </div>
