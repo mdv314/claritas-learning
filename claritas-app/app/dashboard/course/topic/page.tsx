@@ -3,6 +3,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -28,15 +29,82 @@ interface QuizQuestion {
     explanation: string;
 }
 
+interface VideoReference {
+    title: string;
+    url: string;
+    creatorName: string;
+}
+
 interface TopicSection {
     heading: string;
     content: string;
+    videos?: VideoReference[];
 }
 
 interface TopicContent {
     title: string;
     sections: TopicSection[];
     quiz: QuizQuestion[];
+    searchAttribution?: string;
+}
+
+function getYouTubeId(url: string): string | null {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+}
+
+function VideoEmbed({ video }: { video: VideoReference }) {
+    const ytId = getYouTubeId(video.url);
+
+    if (ytId) {
+        return (
+            <div className="my-5 rounded-xl overflow-hidden border border-gray-200 bg-black">
+                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                    <iframe
+                        className="absolute top-0 left-0 w-full h-full"
+                        src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`}
+                        title={video.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                        allowFullScreen
+                    />
+                </div>
+                <div className="bg-white px-4 py-3 flex items-center justify-between">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{video.title}</p>
+                        <p className="text-xs text-gray-500">{video.creatorName}</p>
+                    </div>
+                    <a
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-400 hover:text-gray-600 shrink-0 ml-3"
+                    >
+                        Watch on YouTube
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <a
+            href={video.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-4 my-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+        >
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div>
+                <p className="font-medium text-gray-900">{video.title}</p>
+                <p className="text-sm text-gray-500">by {video.creatorName}</p>
+            </div>
+        </a>
+    );
 }
 
 function TopicPageContent() {
@@ -166,9 +234,22 @@ function TopicPageContent() {
                     {content?.sections.map((section, idx) => (
                         <div key={idx} className="mb-10 last:mb-0">
                             <h2 className="text-xl font-bold text-gray-800 mb-4">{section.heading}</h2>
-                            <div className="prose text-gray-600 whitespace-pre-wrap leading-relaxed text-lg">
-                                {section.content}
+                            <div className="prose text-gray-600 leading-relaxed text-lg">
+                                <MarkdownRenderer content={section.content} />
                             </div>
+                            {section.videos && section.videos.length > 0 && (
+                                <div className="mt-6">
+                                    {section.videos.map((video, vIdx) => (
+                                        <VideoEmbed key={vIdx} video={video} />
+                                    ))}
+                                    {content?.searchAttribution && (
+                                        <div
+                                            className="mt-1 opacity-60 scale-90 origin-left"
+                                            dangerouslySetInnerHTML={{ __html: content.searchAttribution }}
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -187,7 +268,7 @@ function TopicPageContent() {
                     <div className="space-y-8">
                         {content?.quiz.map((q, qIdx) => (
                             <div key={qIdx} className="bg-gray-50 rounded-xl p-6">
-                                <p className="font-semibold text-gray-900 mb-4 text-lg">{qIdx + 1}. {q.question}</p>
+                                <div className="font-semibold text-gray-900 mb-4 text-lg">{qIdx + 1}. <MarkdownRenderer content={q.question} className="inline" /></div>
                                 <div className="space-y-3">
                                     {q.options.map((opt, oIdx) => {
                                         const isSelected = selectedAnswers[qIdx] === oIdx;
@@ -211,7 +292,7 @@ function TopicPageContent() {
                                                 className={btnClass}
                                                 disabled={revealed}
                                             >
-                                                {opt}
+                                                <MarkdownRenderer content={opt} />
                                                 {revealed && isCorrect && (
                                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600">
                                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,7 +329,7 @@ function TopicPageContent() {
                                         <p className="font-bold mb-1 flex items-center gap-2">
                                             {selectedAnswers[qIdx] === q.correctAnswerIndex ? 'Correct!' : 'Not quite right.'}
                                         </p>
-                                        <p className="text-sm leading-relaxed">{q.explanation}</p>
+                                        <div className="text-sm leading-relaxed"><MarkdownRenderer content={q.explanation} /></div>
                                     </div>
                                 )}
                             </div>

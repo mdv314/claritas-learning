@@ -105,3 +105,32 @@ export const evaluateAssessment = async (grade: GradeLevel, subject: Subject, re
 
     return response.json();
 }
+
+export const generateModuleQuiz = async (courseId: string, unitNumber: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/generate_module_quiz`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, unitNumber }),
+    });
+    if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return response.json();
+};
+
+export const evaluateModuleQuiz = async (
+    courseId: string,
+    unitNumber: number,
+    mcqAnswers: number[],
+    frqAnswers: string[]
+): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/evaluate_module_quiz`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, unitNumber, mcqAnswers, frqAnswers }),
+    });
+    if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return response.json();
+};
