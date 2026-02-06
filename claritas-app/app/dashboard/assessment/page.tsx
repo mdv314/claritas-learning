@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { CalibrationResult, GradeLevel, Question, Result, Subject, UserAnswer } from "@/types";
 import { evaluateAssessment, generateAssessmentQuestions } from "@/services/apiService";
 import AssessmentResults from "@/components/AssessmentResults";
@@ -22,9 +22,18 @@ const AssessmentPage: React.FC = () => {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [calibrationResult, setCalibrationResult] = useState<CalibrationResult | null>(null);
-    const currentStep = 
-    appState === AppState.SETUP ? 0 : 
-    (appState === AppState.QUIZ || appState === AppState.LOADING_RESULTS) ? 1 : 2;
+    const currentStep = appState;
+
+    useEffect(() => {
+      const topic = localStorage.getItem("course_topic");
+      const notes = localStorage.getItem("course_notes");
+      const materials = localStorage.getItem("course_materials");
+    
+      if (topic) {
+        setSubject(topic as Subject);
+      }
+  
+    }, []);
 
     const handleStartAssessment = async () => {
       setIsGenerating(true);
@@ -86,16 +95,6 @@ const AssessmentPage: React.FC = () => {
             <StepIndicator currentStep={currentStep} />
 
             <main className="transition-all duration-500 transform">
-            {appState === AppState.SETUP && (
-                <AssessmentSelector
-                grade={grade}
-                subject={subject}
-                onGradeChange={setGrade}
-                onSubjectChange={setSubject}
-                onSubmit={handleStartAssessment}
-                isLoading={isGenerating}
-                />
-            )}
 
             {appState === AppState.QUIZ && (
                 <AssessmentQuiz 

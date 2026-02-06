@@ -14,6 +14,15 @@ export interface UserInformation {
     password: string;
 }
 
+export interface UserPreferences {
+    role: UserRole;
+    state: string;
+    educationLevel: EducationLevel;
+    grade: string;
+    learningStyle: string;
+    traits: string;
+}
+
 export interface LoginInfo {
     email: string;
     password: string;

@@ -1,6 +1,6 @@
 // services/apiService.ts
 import { useState } from "react";
-import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, GradeLevel, Subject, AssessmentSubmission, Question, CalibrationResult, Result } from "../types";
+import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, GradeLevel, Subject, AssessmentSubmission, Question, CalibrationResult, Result, UserPreferences } from "../types";
 
 const API_BASE_URL = "http://127.0.0.1:5000";
 
@@ -26,7 +26,7 @@ export const generateCourse = async (profile: PreferenceProfile): Promise<any> =
     return response.json();
 };
 
-export const createUser = async (userCreation: UserInformation): Promise<any> => {
+export const createUser = async (userCreation: UserInformation, userPreferences: UserPreferences): Promise<any> => {
     console.log(userCreation)
     const response = await fetch(`api/signup`, {
         method: 'POST',
@@ -134,3 +134,16 @@ export const evaluateModuleQuiz = async (
     }
     return response.json();
 };
+
+export const updateUserPreferences = async (role: string, education: string, grade: string, state: string, traits: string, style: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/update_user_preferences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role, education, grade, state, traits, style }),
+    });
+    if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return response.json();
+}

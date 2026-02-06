@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     }
 
     const token = data.session.access_token;
+    const authID = data.user.id;
 
     // Set HttpOnly cookie
     const response = NextResponse.json({ success: true });

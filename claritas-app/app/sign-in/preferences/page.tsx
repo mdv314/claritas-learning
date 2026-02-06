@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import PreferenceForm from '../../components/PreferenceForm';
-import { CourseView } from '../../components/CourseView';
+import React, { ReactNode, useState } from 'react';
+import PreferenceForm from '../../../components/PreferenceForm';
+import { CourseView } from '../../../components/CourseView';
 import { Loader2, Sparkles } from 'lucide-react';
 
 interface PreferencesContainerProps {
     onBackToHome: () => void;
-  }
+}
+
 
 const PreferencesPage: React.FC<PreferencesContainerProps> = ({ onBackToHome }) => {
     const [courseData, setCourseData] = useState<any | null>(null);

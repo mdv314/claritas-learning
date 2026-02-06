@@ -1,9 +1,11 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { 
   UserRole, 
   EducationLevel, 
-  PreferenceProfile 
+  PreferenceProfile, 
+  UserInformation,
+  UserPreferences
 } from '../types';
 import {
   US_STATES,
@@ -15,6 +17,8 @@ import {
 } from '../constants';
 import { ChevronLeft, ChevronRight, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { SessionContext } from "@/context/SessionContext";
+import { createUser } from '@/services/apiService';
 
 interface Props {
     onComplete: (data: any) => void; 
@@ -38,24 +42,17 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
     const [customSubject, setCustomSubject] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const router = useRouter();
+    const session = useContext(SessionContext);
 
-    const totalSteps = 5;
+    const totalSteps = 4;
     const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps + 1));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
     useEffect(() => {
-        const fetchSession = async () => {
-          try {
-            const res = await fetch('/api/auth', { credentials: 'include' });
-            const data = await res.json();
-            setIsAuthenticated(data.authenticated);
-          } catch {
-            setIsAuthenticated(false);
-          }
-        };
-    
-        fetchSession();
-      }, [setIsAuthenticated])
+        if (!session) {
+            router.push('/sign-in')
+        }
+    })
 
     const toggleTrait = (trait: string) => {
         setProfile(prev => ({
@@ -77,41 +74,22 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
         onProcessingChange(true);
 
         try {
-            const formData = new FormData();
-            
-            // Map PreferenceProfile to the Form fields your Python backend expects
-            formData.append('topic', profile.customGoals || `Course for ${profile.grade}`);
-            formData.append('skill_level', profile.educationLevel);
-            formData.append('age_group', profile.grade);
-            formData.append('state', profile.state);
-            formData.append('traits', profile.traits.join(','));
-            formData.append('style', profile.learningStyle);
+            if (session) {
+                const userInformation: UserInformation = { name: session.name!, email: session.email!, password: session.password! }
+                const userPrefs: UserPreferences = { role: profile.role, educationLevel: profile.educationLevel, grade: profile.grade, state: profile.state,
+                    traits: profile.traits.join(','), learningStyle: profile.learningStyle
+                }
 
-            // 2. Make the API Call to your FastAPI server (Port 5000)
-            if (isAuthenticated) {
-                console.log("DEBUG: Form Data:", formData);
-                const response = await fetch('http://127.0.0.1:5000/generate_course', {
-                    method: 'POST',
-                    // Fetch automatically handles multipart/form-data boundary when passing FormData
-                    body: formData,
-                });
+                const response = await createUser(userInformation, userPrefs)
 
                 if (!response.ok) {
                     throw new Error(`Server responded with ${response.status}`);
                 }
 
                 const result = await response.json();
-                console.log("DEBUG: Course Data:", result);
-                onComplete(result);
+                router.push('/dashboard');
             } else {
-                const obj: Record<string, string> = {};
-                formData.forEach((value, key) => {
-                    obj[key] = value.toString();
-                });
-                console.log("DEBUG: Preferences Object:", obj);
-                localStorage.setItem("preferences", JSON.stringify(obj));
                 router.push('/sign-in');
-                alert('Please sign in to generate a course.');
             }
         } catch (error) {
             console.error("Course Generation Error:", error);
@@ -127,7 +105,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
             {/* Steps Progress Header */}
             <div className="px-10 py-8 border-b border-slate-100 bg-white/40 flex items-center justify-between">
                 <div className="flex gap-4">
-                    {[1, 2, 3, 4].map(i => (
+                    {[1, 2, 3].map(i => (
                         <div key={i} className="group relative">
                             <div className={`-translate-x-1/2 ml-8 text-[10px] font-black text-indigo-600 tracking-widest transition-opacity duration-300 ${step === i ? 'opacity-100' : 'opacity-0'}`}>
                                 STEP {i}
@@ -137,7 +115,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
                     ))}
                 </div>
                 <div className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">
-                    Profile: {Math.round((step / totalSteps) * 100)}% Complete
+                    Profile: {Math.round((step / (totalSteps -  1)) * 100)}% Complete
                 </div>
             </div>
 
@@ -294,59 +272,6 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
                                             {trait}
                                         </button>
                                     ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 4: Weaknesses & Goals */}
-                    {step === 4 && (
-                        <div className="space-y-10 animate-fade-in">
-                            <div className="space-y-2">
-                                <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">Growth <br/><span className="text-indigo-600">Objectives</span></h2>
-                                <p className="text-slate-500 text-lg font-medium">Focus the AI on your specific challenges.</p>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {COMMON_SUBJECTS.map(subject => (
-                                    <button
-                                        key={subject}
-                                        type="button"
-                                        onClick={() => toggleWeakness(subject)}
-                                        className={`p-4 rounded-2xl text-xs font-bold border transition-all flex items-center justify-between ${profile.weaknesses.includes(subject)
-                                            ? 'border-rose-500 bg-rose-50 text-rose-600 shadow-sm'
-                                            : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'
-                                            }`}
-                                    >
-                                        {subject}
-                                        {profile.weaknesses.includes(subject) && <CheckCircle2 size={14} />}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="space-y-6">
-                                <div className="relative group">
-                                    <input
-                                        type="text"
-                                        placeholder="Add a custom topic or struggle..."
-                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] px-8 py-5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold text-slate-800 placeholder:text-slate-400"
-                                        value={customSubject}
-                                        onChange={(e) => setCustomSubject(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), customSubject.trim() && toggleWeakness(customSubject.trim()), setCustomSubject(''))}
-                                    />
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                        <button type="button" onClick={() => (customSubject.trim() && toggleWeakness(customSubject.trim()), setCustomSubject(''))} className="p-3 px-5 rounded-xl bg-slate-900 text-white font-black text-xs hover:bg-black transition-all shadow-md">ADD</button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 px-1">
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Detailed Course Vision</label>
-                                    <textarea
-                                        placeholder="What are your specific learning dreams or current obstacles?"
-                                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] px-8 py-5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold text-slate-800 placeholder:text-slate-400 resize-none"
-                                        value={profile.customGoals}
-                                        onChange={(e) => setProfile({ ...profile, customGoals: e.target.value })}
-                                    />
                                 </div>
                             </div>
                         </div>

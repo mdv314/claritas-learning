@@ -53,8 +53,6 @@ const Header = () => (
 
 const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, isLoading: boolean }) => {
     const [topic, setTopic] = useState('');
-    const [skillLevel, setSkillLevel] = useState('Beginner');
-    const [ageGroup, setAgeGroup] = useState('Adult (18+)');
     const [notes, setNotes] = useState('');
     const [materials, setMaterials] = useState('');
     const [file, setFile] = useState<File | null>(null);
@@ -63,8 +61,6 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
         e.preventDefault();
         const formData = new FormData();
         formData.append('topic', topic);
-        formData.append('skill_level', skillLevel);
-        formData.append('age_group', ageGroup);
         formData.append('additional_notes', notes);
         formData.append('materials_text', materials);
         if (file) {
@@ -142,9 +138,9 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Generating Course...
+                            Generating Assessment...
                         </span>
-                    ) : 'Generate Course Plan'}
+                    ) : 'Generate Pre-Assessment'}
                 </button>
             </form>
         </div>
@@ -157,7 +153,10 @@ export default function GeneratePage() {
 
     const handleGenerate = async (formData: FormData) => {
         setIsLoading(true);
-        try {
+        for (const [key, value] of formData.entries()) {
+            localStorage.setItem(key, value.toString())
+        }
+        /*try {
             const response = await fetch('http://127.0.0.1:5000/generate_course', {
                 method: 'POST',
                 body: formData,
@@ -178,8 +177,9 @@ export default function GeneratePage() {
             console.error('Failed to generate course:', error);
             alert('Something went wrong. Please check if the backend is running.');
             setIsLoading(false);
-        }
+        }*/
     };
+
 
     return (
         <div className="min-h-screen bg-[#fafafa]">

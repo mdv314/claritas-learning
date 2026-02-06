@@ -16,6 +16,9 @@ import { createUser } from '@/services/apiService';
 import { UserInformation } from '@/types';
 import { useAuthMode } from '@/app/sign-in/AuthModeContext';
 import { useRouter } from 'next/navigation';
+import { NextResponse } from 'next/server';
+
+import { useSession } from "@/context/SessionContext";
 
 export default function SignUpForm() {
     const [signUpData, setSignUpData] = useState<UserInformation>({
@@ -29,6 +32,10 @@ export default function SignUpForm() {
     const { mode, setMode } = useAuthMode();
     const [passwordCheck, setPasswordCheck] = useState<string>('');
     const router = useRouter();
+
+    const { setCredentials } = useSession();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
 
     const handlePasswordCheck = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -58,16 +65,9 @@ export default function SignUpForm() {
         }
 
         try {
-          const result = await createUser(signUpData)
-          console.log()
-          console.log('Authentication successful:', { mode: 'signup', email: result });
-          const accessToken = "your-jwt-here";
-          const expires = new Date();
-          expires.setHours(expires.getHours() + 6);
-
-          document.cookie = `access_token=${accessToken}; expires=${expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax; path=/`;
+          setCredentials(signUpData.name, signUpData.email, signUpData.password)
           setSuccess(true);
-          router.push('/dashboard');
+          router.push('/preferences');
         } catch (err) {
             setError("An unexpected error occurred. Please try again.");
         } finally {

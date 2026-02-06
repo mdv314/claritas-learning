@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Response
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from pydantic import BaseModel, EmailStr
@@ -15,6 +15,7 @@ from assessment_generator import AssessmentGenerator
 from database import supabase
 from fastapi.responses import JSONResponse
 import easyocr
+import jwt
 
 load_dotenv()
 
@@ -303,65 +304,30 @@ def mastery_from_score(score: int) -> str:
 ##########################
 # USER-RELATED FUNCTIONS #
 ##########################
-class User(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
+class Preferences(BaseModel):
+    role: str
+    education: str
+    grade: str
+    state: str
+    traits: str
+    style: str
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "name": "Alice",
-                "email": "alice@example.com",
-                "password": "securePassword123"
-            }
-        }
-    }
+def get_auth_id(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = jwt.decode(token, os.environ["SUPABASE_SECRET_KEY"], algorithms=["HS256"], audience="authenticated")
+    return payload["sub"]
 
-@app.post("/create_user")
-def create_user(user: User):
-    try:
-        # 1️⃣ Check if email already exists in Supabase Auth
-        try:
-            existing_user = supabase.auth.admin.get_user_by_email(user.email)
-            if existing_user:
-                raise {"message": "User created successfully", "data": 'email'}
-        except Exception as e:
-            # Supabase may throw if user does not exist; ignore that
-            pass
+@app.post("update_user_preferences")
+def update_user_prefs(request: Request, prefs: Preferences):
+    token = request.cookies.get("access_token")
+    print(token)
+    return {'success': 200}
 
-        try:
-            auth_response = supabase.auth.admin.create_user({
-                "email": user.email,
-                "password": user.password,
-                "email_confirm": True  # Automatically confirm email
-            })
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Supabase service unavailable: {str(e)}")
-
-        if not auth_response or not hasattr(auth_response, "user") or not auth_response.user:
-            raise HTTPException(status_code=400, detail="Auth signup failed")
-
-        user_id = auth_response.user.id
-
-        # 3️⃣ Insert profile info into your users table
-        db_response = supabase.table("users").insert({
-            "auth_id": user_id,
-            "name": user.name,
-            "email": user.email
-        }).execute()
-
-        # 4️⃣ Check for DB errors
-        if hasattr(db_response, 'error') and db_response.error:
-            raise HTTPException(status_code=500, detail=str(db_response.error))
-
-        return {"message": "User created successfully", "data": db_response.data}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
+@app.get("/get_user_info")
+def get_user_info():
+    return {'success': 200}
 
 class ModuleQuizRequest(BaseModel):
     courseId: str
