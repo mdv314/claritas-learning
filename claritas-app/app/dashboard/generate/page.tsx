@@ -74,7 +74,7 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
     };
 
     return (
-        <div className="max-w-2xl mx-auto py-16 px-6">
+        <div className="flex flex-col max-w-2xl mx-auto py-16 px-6 overflow-y">
             <div className="text-center mb-10">
                 <h1 className="text-4xl font-bold text-gray-900 mb-4">Create Your Course</h1>
                 <p className="text-gray-600">Tell us what you want to learn, and we'll design a custom curriculum for you.</p>
@@ -91,34 +91,6 @@ const GenerateForm = ({ onSubmit, isLoading }: { onSubmit: (data: any) => void, 
                         value={topic}
                         onChange={(e) => setTopic(e.target.value)}
                     />
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Skill Level</label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white text-gray-900"
-                            value={skillLevel}
-                            onChange={(e) => setSkillLevel(e.target.value)}
-                        >
-                            <option>Beginner</option>
-                            <option>Intermediate</option>
-                            <option>Advanced</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Age Group</label>
-                        <select
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-white text-gray-900"
-                            value={ageGroup}
-                            onChange={(e) => setAgeGroup(e.target.value)}
-                        >
-                            <option value="Child">Child (5-10)</option>
-                            <option value="Teen">Teen (11-17)</option>
-                            <option value="Adult">Adult (18+)</option>
-                            <option value="Senior">Senior</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div>
