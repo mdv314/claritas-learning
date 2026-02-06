@@ -28,7 +28,7 @@ export const generateCourse = async (profile: PreferenceProfile): Promise<any> =
 
 export const createUser = async (userCreation: UserInformation): Promise<any> => {
     console.log(userCreation)
-    const response = await fetch(`${API_BASE_URL}/create_user`, {
+    const response = await fetch(`api/signup`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

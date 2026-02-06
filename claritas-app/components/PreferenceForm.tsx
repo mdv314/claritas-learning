@@ -89,6 +89,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
 
             // 2. Make the API Call to your FastAPI server (Port 5000)
             if (isAuthenticated) {
+                console.log("DEBUG: Form Data:", formData);
                 const response = await fetch('http://127.0.0.1:5000/generate_course', {
                     method: 'POST',
                     // Fetch automatically handles multipart/form-data boundary when passing FormData

@@ -1,3 +1,4 @@
+'use client'
 import React, { useState } from 'react';
 import { 
   Mail, 
@@ -14,6 +15,7 @@ import {
 import { createUser } from '@/services/apiService';
 import { UserInformation } from '@/types';
 import { useAuthMode } from '@/app/sign-in/AuthModeContext';
+import { useRouter } from 'next/navigation';
 
 export default function SignUpForm() {
     const [signUpData, setSignUpData] = useState<UserInformation>({
@@ -26,6 +28,7 @@ export default function SignUpForm() {
     const [success, setSuccess] = useState(false);
     const { mode, setMode } = useAuthMode();
     const [passwordCheck, setPasswordCheck] = useState<string>('');
+    const router = useRouter();
 
     const handlePasswordCheck = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -63,6 +66,7 @@ export default function SignUpForm() {
 
           document.cookie = `access_token=${accessToken}; expires=${expires.toUTCString()}; HttpOnly; Secure; SameSite=Lax; path=/`;
           setSuccess(true);
+          router.push('/dashboard');
         } catch (err) {
             setError("An unexpected error occurred. Please try again.");
         } finally {

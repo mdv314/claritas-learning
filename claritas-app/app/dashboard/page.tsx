@@ -1,6 +1,6 @@
+'use client'
 import React from "react"
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 interface Quiz {
     title: string;
@@ -30,23 +30,14 @@ interface CoursePlan {
     course_id?: string;
 }
 
-interface CourseDashboardProps {
-    courses: CoursePlan[];
-    onAddNew: () => void;
-  }
 
-  const Dashboard = async ({ courses, onAddNew }: CourseDashboardProps) => {
-    const cookieStore = await cookies()
-    let token: string | undefined
+  const DashboardPage = () => {
+    const router = useRouter();
 
-    for (const cookie of cookieStore.getAll()) {
-        if (cookie.name === 'access_token') token = cookie.value
-        console.log(token)
+    const addNewCourse = () => {
+      router.push('/dashboard/generate');
     }
 
-    if (!token) {
-        redirect('/sign-in')
-    }
     return (
         <div className="relative flex flex-col justify-center items-center min-h-screen py-8">
           <div className="w-full max-w-[1200px] space-y-8">
@@ -56,7 +47,7 @@ interface CourseDashboardProps {
                 <p className="text-slate-500 mt-2 font-medium">Manage your personalized learning paths and progress.</p>
               </div>
               <button
-                onClick={onAddNew}
+                onClick={addNewCourse}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,7 +68,6 @@ interface CourseDashboardProps {
                 Complete a self-assessment to generate a custom-tailored course path based on your current knowledge.
               </p>
               <button
-                onClick={onAddNew}
                 className="text-indigo-600 font-bold hover:text-indigo-700 transition-colors"
               >
                 Start your first assessment &rarr;
@@ -145,4 +135,4 @@ interface CourseDashboardProps {
       );
 }
 
-export default Dashboard;
+export default DashboardPage;
