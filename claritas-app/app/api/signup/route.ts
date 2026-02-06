@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     });
 
     if (signUpError) {
+      console.error('Supabase signUp error:', signUpError.message, signUpError);
       // Handle already registered case
       if (signUpError.message.includes('already registered')) {
         return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
@@ -39,7 +40,9 @@ export async function POST(req: Request) {
 
     // 2️⃣ Extract user ID from signUpData
     const userId = signUpData.user?.id;
+    console.log('signUpData:', JSON.stringify(signUpData, null, 2));
     if (!userId) {
+      console.error('No user ID returned from signUp');
       return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
     }
 
@@ -49,6 +52,7 @@ export async function POST(req: Request) {
       .insert({ auth_id: userId, name, email });
 
     if (dbError) {
+      console.error('DB insert error:', dbError.message, dbError);
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 

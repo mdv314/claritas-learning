@@ -47,6 +47,7 @@ export default function SignUpForm() {
 
         if (signUpData.password != passwordCheck) {
             setError('Passwords do not match.')
+            setIsLoading(false);
             return;
         }
         
