@@ -40,7 +40,7 @@ interface CourseProgress {
 
 // Helper to generate a simple course ID from the title
 const getCourseId = (title: string) => {
-    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+    return (title || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
 };
 
 // Helper to get/set course progress from localStorage

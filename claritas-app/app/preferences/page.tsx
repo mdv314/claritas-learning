@@ -18,11 +18,11 @@ const PreferencesPage: React.FC<PreferencesContainerProps> = ({ onBackToHome }) 
     };
 
     // View 1: The Generated Roadmap
-    if (courseData) {
+    if (courseData && courseData.courseTitle) {
         return (
             <div className="min-h-screen bg-slate-50">
                 <div className="max-w-7xl mx-auto pt-32 animate-fade-in">
-                    <CourseView course={courseData} />
+                    <CourseView course={courseData} courseId={courseData.course_id} />
                     
                     <div className="flex justify-center pb-32">
                         <button 
