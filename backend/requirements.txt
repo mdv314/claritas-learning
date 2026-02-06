@@ -4,3 +4,4 @@ supabase
 google-genai
 python-dotenv
 pydantic
+easyocr
