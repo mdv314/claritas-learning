@@ -41,7 +41,6 @@ course_generator = CourseGenerator()
 assessment_generator = AssessmentGenerator()
 reader = easyocr.Reader(['en'])
 
-
 @app.get("/")
 def root():
     return {"message": "works"}

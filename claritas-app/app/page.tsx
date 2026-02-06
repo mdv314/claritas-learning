@@ -52,7 +52,7 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link 
-              href="/preferences"
+              href="/sign-in"
               className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 hover:shadow-2xl hover:shadow-indigo-200 transition-all active:scale-95"
             >
               Generate Your Course
@@ -191,7 +191,7 @@ export default function HomePage() {
             AI-driven education.
           </p>
           <Link 
-            href='/preferences'
+            href='/sign-in'
             className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 hover:scale-105 transition-all shadow-xl shadow-indigo-200 relative z-10"
           >
             Start Your First Course
