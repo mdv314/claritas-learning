@@ -106,6 +106,57 @@ export const evaluateAssessment = async (grade: GradeLevel, subject: Subject, re
     return response.json();
 }
 
+export const enrollInCourse = async (courseId: string): Promise<any> => {
+    const response = await fetch('/api/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ course_id: courseId }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const getUserCourses = async (): Promise<any> => {
+    const response = await fetch('/api/courses', {
+        method: 'GET',
+        credentials: 'include',
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const updateCourseProgress = async (
+    courseId: string,
+    completedTopics: string[],
+    lastVisited: string | null
+): Promise<any> => {
+    const response = await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            course_id: courseId,
+            completed_topics: completedTopics,
+            last_visited: lastVisited,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+
+    return response.json();
+};
+
 export const generateModuleQuiz = async (courseId: string, unitNumber: number): Promise<any> => {
     const response = await fetch(`${API_BASE_URL}/generate_module_quiz`, {
         method: "POST",

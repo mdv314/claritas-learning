@@ -1,9 +1,10 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import { updateCourseProgress } from '@/services/apiService';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -120,6 +121,25 @@ function TopicPageContent() {
     // Quiz state
     const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: number }>({});
     const [showResults, setShowResults] = useState<{ [key: number]: boolean }>({});
+    const progressSynced = useRef(false);
+
+    // Mark topic as completed in localStorage and sync to Supabase when content loads
+    useEffect(() => {
+        if (!content || !courseId || !unitNumber || !subtopicIndex || progressSynced.current) return;
+        progressSynced.current = true;
+
+        const topicKey = `${unitNumber}-${subtopicIndex}`;
+        const stored = localStorage.getItem(`course-progress-${courseId}`);
+        if (stored) {
+            const progress = JSON.parse(stored);
+            if (!progress.completedTopics.includes(topicKey)) {
+                progress.completedTopics.push(topicKey);
+            }
+            progress.lastVisited = topicKey;
+            localStorage.setItem(`course-progress-${courseId}`, JSON.stringify(progress));
+            updateCourseProgress(courseId, progress.completedTopics, progress.lastVisited).catch(() => {});
+        }
+    }, [content, courseId, unitNumber, subtopicIndex]);
 
     const backUrl = courseId && unitNumber
         ? `/course/module?courseId=${courseId}&unit=${unitNumber}`

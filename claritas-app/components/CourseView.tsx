@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { enrollInCourse } from '@/services/apiService';
 
 // --- Types ---
 
@@ -83,10 +84,18 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
     const completedCount = progress.completedTopics.length;
     const progressPercentage = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
 
-    const handleEnroll = () => {
+    const handleEnroll = async () => {
         const newProgress = { ...progress, isEnrolled: true };
         setProgress(newProgress);
         saveProgress(courseId, newProgress);
+
+        // Also persist enrollment to Supabase (fire-and-forget, localStorage is the fast cache)
+        try {
+            await enrollInCourse(courseId);
+        } catch (err) {
+            // Non-blocking: user may not be logged in, enrollment still works via localStorage
+            console.warn('Could not enroll via API (user may not be signed in):', err);
+        }
     };
 
     const handleModuleClick = (unitNumber: number) => {

@@ -363,6 +363,100 @@ def create_user(user: User):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
+################################
+# ENROLLMENT & PROGRESS       #
+################################
+
+class EnrollRequest(BaseModel):
+    auth_id: str
+    course_id: str
+
+class UpdateProgressRequest(BaseModel):
+    auth_id: str
+    course_id: str
+    completed_topics: List[str]
+    last_visited: Optional[str] = None
+
+@app.post("/enroll")
+async def enroll_in_course(request: EnrollRequest):
+    """Enroll a user in a course. Reads course JSON to denormalize metadata."""
+    filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        course_data = json.load(f)
+
+    plan = course_data.get("course_plan", {})
+    metadata = plan.get("metadata", {})
+
+    row = {
+        "auth_id": request.auth_id,
+        "course_id": request.course_id,
+        "course_title": plan.get("courseTitle", "Untitled"),
+        "course_description": plan.get("description", ""),
+        "skill_level": metadata.get("skillLevel", ""),
+        "age_group": metadata.get("ageGroup", ""),
+        "estimated_duration": metadata.get("estimatedTotalDuration", ""),
+    }
+
+    try:
+        result = supabase.table("user_courses").insert(row).execute()
+        return {"message": "Enrolled successfully", "data": result.data}
+    except Exception as e:
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower() or "23505" in error_msg:
+            # Already enrolled - return existing record
+            existing = supabase.table("user_courses").select("*").eq(
+                "auth_id", request.auth_id
+            ).eq("course_id", request.course_id).execute()
+            return {"message": "Already enrolled", "data": existing.data}
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.get("/user/{auth_id}/courses")
+async def get_user_courses(auth_id: str):
+    """Return all enrolled courses for a user."""
+    result = supabase.table("user_courses").select("*").eq(
+        "auth_id", auth_id
+    ).order("enrolled_at", desc=True).execute()
+    return {"courses": result.data}
+
+@app.post("/update_progress")
+async def update_progress(request: UpdateProgressRequest):
+    """Update progress for a user's enrolled course."""
+    # Verify enrollment exists
+    existing = supabase.table("user_courses").select("id").eq(
+        "auth_id", request.auth_id
+    ).eq("course_id", request.course_id).execute()
+
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Not enrolled in this course")
+
+    # Compute is_completed by comparing to total topics in course JSON
+    is_completed = False
+    filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            course_data = json.load(f)
+        plan = course_data.get("course_plan", {})
+        total_topics = sum(len(u.get("subtopics", [])) for u in plan.get("units", []))
+        if total_topics > 0 and len(request.completed_topics) >= total_topics:
+            is_completed = True
+
+    update_data = {
+        "completed_topics": request.completed_topics,
+        "is_completed": is_completed,
+    }
+    if request.last_visited is not None:
+        update_data["last_visited"] = request.last_visited
+
+    result = supabase.table("user_courses").update(update_data).eq(
+        "auth_id", request.auth_id
+    ).eq("course_id", request.course_id).execute()
+
+    return {"message": "Progress updated", "data": result.data}
+
+
 class ModuleQuizRequest(BaseModel):
     courseId: str
     unitNumber: int

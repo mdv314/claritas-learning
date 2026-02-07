@@ -20,5 +20,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ authenticated: false });
   }
 
-  return NextResponse.json({ authenticated: true });
+  return NextResponse.json({ authenticated: true, user_id: data.user.id });
 }

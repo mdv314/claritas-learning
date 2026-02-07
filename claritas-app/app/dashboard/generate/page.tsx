@@ -200,7 +200,7 @@ export default function GeneratePage() {
 
             // Redirect to the course page
             if (data.course_id) {
-                router.push(`/course/${data.course_id}`);
+                router.push(`/dashboard/course/${data.course_id}`);
             }
         } catch (error) {
             console.error('Failed to generate course:', error);

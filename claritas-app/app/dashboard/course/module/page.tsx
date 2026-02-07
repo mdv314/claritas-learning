@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { updateCourseProgress } from '@/services/apiService';
 
 // --- Types ---
 interface Quiz {
@@ -130,6 +131,10 @@ function ModulePageContent() {
         return { completed, total: unit.subtopics.length };
     };
 
+    const syncProgress = (courseId: string, prog: CourseProgress) => {
+        updateCourseProgress(courseId, prog.completedTopics, prog.lastVisited).catch(() => {});
+    };
+
     const handleTopicClick = (subtopicIndex: number, subtopicName: string) => {
         if (!courseId) return;
 
@@ -138,6 +143,7 @@ function ModulePageContent() {
         const newProgress = { ...progress, lastVisited: topicKey };
         setProgress(newProgress);
         saveProgress(courseId, newProgress);
+        syncProgress(courseId, newProgress);
 
         // Navigate to topic page
         const params = new URLSearchParams({
