@@ -6,23 +6,6 @@ import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { updateCourseProgress } from '@/services/apiService';
 
-const Header = () => (
-    <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
-                C
-            </div>
-            <span className="font-semibold text-xl tracking-tight text-gray-900">Claritas Learning</span>
-        </div>
-        <nav className="flex gap-6 text-sm font-medium text-gray-500">
-            <a href="/" className="hover:text-blue-600 transition-colors">Home</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Courses</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Community</a>
-        </nav>
-        <div className="w-8 h-8 rounded-full bg-gray-200" />
-    </header>
-);
-
 interface QuizQuestion {
     question: string;
     options: string[];
@@ -142,10 +125,10 @@ function TopicPageContent() {
     }, [content, courseId, unitNumber, subtopicIndex]);
 
     const backUrl = courseId && unitNumber
-        ? `/course/module?courseId=${courseId}&unit=${unitNumber}`
+        ? `/dashboard/course/module?courseId=${courseId}&unit=${unitNumber}`
         : courseId
-            ? `/course/${courseId}`
-            : '/generate';
+            ? `/dashboard/course/${courseId}`
+            : '/dashboard';
 
     useEffect(() => {
         if (!courseId || !unitNumber || !subtopicIndex) return;
@@ -192,8 +175,7 @@ function TopicPageContent() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="max-w-4xl mx-auto py-12 px-6 text-center">
                     <div className="animate-pulse flex flex-col items-center">
                         <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
@@ -213,8 +195,7 @@ function TopicPageContent() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="max-w-4xl mx-auto py-12 px-6 text-center">
                     <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100">
                         <h3 className="font-bold text-lg mb-2">Something went wrong</h3>
@@ -232,8 +213,7 @@ function TopicPageContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#fafafa]">
-            <Header />
+        <div className="min-h-screen bg-[#fafafa] pt-24">
             <div className="max-w-3xl mx-auto py-12 px-6">
                 <Link
                     href={backUrl}
@@ -364,8 +344,7 @@ function TopicPageContent() {
 export default function TopicPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="flex items-center justify-center h-[60vh]">
                     <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />

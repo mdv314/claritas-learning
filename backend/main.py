@@ -380,15 +380,22 @@ class UpdateProgressRequest(BaseModel):
 @app.post("/enroll")
 async def enroll_in_course(request: EnrollRequest):
     """Enroll a user in a course. Reads course JSON to denormalize metadata."""
+    print(f"[enroll] auth_id={request.auth_id}, course_id={request.course_id}")
+
     filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
+    print(f"[enroll] looking for file: {filepath}")
+    print(f"[enroll] file exists: {os.path.exists(filepath)}")
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Course not found")
 
     with open(filepath, 'r', encoding='utf-8') as f:
         course_data = json.load(f)
 
+    print(f"[enroll] course_data top-level keys: {list(course_data.keys())}")
     plan = course_data.get("course_plan", {})
     metadata = plan.get("metadata", {})
+    print(f"[enroll] plan keys: {list(plan.keys())}")
+    print(f"[enroll] metadata: {metadata}")
 
     row = {
         "auth_id": request.auth_id,
@@ -399,12 +406,17 @@ async def enroll_in_course(request: EnrollRequest):
         "age_group": metadata.get("ageGroup", ""),
         "estimated_duration": metadata.get("estimatedTotalDuration", ""),
     }
+    print(f"[enroll] inserting row: {row}")
 
     try:
         result = supabase.table("user_courses").insert(row).execute()
+        print(f"[enroll] insert success: {result.data}")
         return {"message": "Enrolled successfully", "data": result.data}
     except Exception as e:
         error_msg = str(e)
+        print(f"[enroll] insert error: {error_msg}")
+        import traceback
+        traceback.print_exc()
         if "duplicate" in error_msg.lower() or "unique" in error_msg.lower() or "23505" in error_msg:
             # Already enrolled - return existing record
             existing = supabase.table("user_courses").select("*").eq(

@@ -57,23 +57,6 @@ const saveProgress = (courseId: string, progress: CourseProgress) => {
     }
 };
 
-const Header = () => (
-    <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
-                C
-            </div>
-            <span className="font-semibold text-xl tracking-tight text-gray-900">Claritas Learning</span>
-        </div>
-        <nav className="flex gap-6 text-sm font-medium text-gray-500">
-            <a href="/" className="hover:text-blue-600 transition-colors">Home</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Courses</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Community</a>
-        </nav>
-        <div className="w-8 h-8 rounded-full bg-gray-200" />
-    </header>
-);
-
 function ModulePageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -152,7 +135,7 @@ function ModulePageContent() {
             subtopic: subtopicIndex.toString(),
             name: subtopicName
         });
-        router.push(`/course/topic?${params.toString()}`);
+        router.push(`/dashboard/course/topic?${params.toString()}`);
     };
 
     const handleModuleNavigation = (newUnitNumber: number) => {
@@ -161,16 +144,15 @@ function ModulePageContent() {
             courseId: courseId,
             unit: newUnitNumber.toString()
         });
-        router.push(`/course/module?${params.toString()}`);
+        router.push(`/dashboard/course/module?${params.toString()}`);
     };
 
-    const backUrl = courseId ? `/course/${courseId}` : '/generate';
+    const backUrl = courseId ? `/dashboard/course/${courseId}` : '/dashboard';
     const moduleProgress = getModuleProgress();
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="flex items-center justify-center h-[60vh]">
                     <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -183,8 +165,7 @@ function ModulePageContent() {
 
     if (error || !course || !unit) {
         return (
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="max-w-4xl mx-auto py-12 px-6">
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
@@ -203,9 +184,7 @@ function ModulePageContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#fafafa]">
-            <Header />
-
+        <div className="min-h-screen bg-[#fafafa] pt-24">
             <div className="max-w-6xl mx-auto py-8 px-6">
                 {/* Breadcrumb */}
                 <Link
@@ -373,7 +352,7 @@ function ModulePageContent() {
                                         <p className="text-sm text-gray-500">{unit.quiz.questionCount} questions</p>
                                     </div>
                                     <button
-                                        onClick={() => router.push(`/course/quiz?courseId=${courseId}&unitNumber=${unitNumber}`)}
+                                        onClick={() => router.push(`/dashboard/course/quiz?courseId=${courseId}&unitNumber=${unitNumber}`)}
                                         className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                                     >
                                         Start Quiz
@@ -421,8 +400,7 @@ function ModulePageContent() {
 export default function ModulePage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#fafafa]">
-                <Header />
+            <div className="min-h-screen bg-[#fafafa] pt-24">
                 <div className="flex items-center justify-center h-[60vh]">
                     <div className="flex flex-col items-center gap-4">
                         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />

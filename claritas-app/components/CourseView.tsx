@@ -104,7 +104,7 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
             courseId: courseId,
             unit: unitNumber.toString()
         });
-        router.push(`/course/module?${params.toString()}`);
+        router.push(`/dashboard/course/module?${params.toString()}`);
     };
 
     const handlePickUpWhereLeftOff = () => {
