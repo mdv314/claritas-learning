@@ -169,6 +169,32 @@ export const generateModuleQuiz = async (courseId: string, unitNumber: number): 
     return response.json();
 };
 
+export const sendQuizHelpMessage = async (
+    courseId: string,
+    unitNumber: number,
+    questionIndex: number,
+    questionType: string,
+    conversationHistory: { role: string; text: string }[],
+    studentMessage: string
+): Promise<{ response: string }> => {
+    const response = await fetch(`${API_BASE_URL}/quiz_help/text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            courseId,
+            unitNumber,
+            questionIndex,
+            questionType,
+            conversationHistory,
+            studentMessage
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return response.json();
+};
+
 export const evaluateModuleQuiz = async (
     courseId: string,
     unitNumber: number,

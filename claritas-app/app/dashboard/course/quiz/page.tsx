@@ -102,8 +102,8 @@ function QuizPageContent() {
     };
 
     const backUrl = courseId && unitNumber
-        ? `/course/module?courseId=${courseId}&unit=${unitNumber}`
-        : '/generate';
+        ? `/dashboard/course/module?courseId=${courseId}&unit=${unitNumber}`
+        : '/dashboard';
 
     useEffect(() => {
         if (!courseId || !unitNumber) return;
