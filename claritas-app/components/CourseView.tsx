@@ -97,7 +97,7 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
     }, [progress.isEnrolled, courseId]);
 
     // Calculate total topics and progress percentage
-    const totalTopics = course.units.reduce((sum, unit) => sum + unit.subtopics.length, 0);
+    const totalTopics = (course.units || []).reduce((sum, unit) => sum + unit.subtopics.length, 0);
     const completedCount = progress.completedTopics.length;
     const progressPercentage = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
 
@@ -135,7 +135,7 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
             handleModuleClick(unitNumber);
         } else {
             // If no last visited, go to first module
-            const firstUnit = course.units[0];
+            const firstUnit = course.units?.[0];
             if (firstUnit) {
                 handleModuleClick(firstUnit.unitNumber);
             }
@@ -215,7 +215,7 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
                 </div>
 
                 <div className="divide-y divide-gray-100">
-                    {course.units.map((unit) => {
+                    {(course.units || []).map((unit) => {
                         const moduleProgress = getModuleProgress(unit);
                         const allTopicsDone = moduleProgress.completed === moduleProgress.total;
                         const unitQuiz = getUnitQuizStatus(unit.unitNumber);
