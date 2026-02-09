@@ -38,6 +38,7 @@ class QuizQuestion(BaseModel):
     options: List[str] = Field(description="List of multiple choice options")
     correctAnswerIndex: int = Field(description="Index of the correct answer (0-based)")
     explanation: str = Field(description="Explanation of why the answer is correct")
+    relatedSubtopic: str = Field(default="", description="The subtopic this question primarily assesses")
 
 class VideoReference(BaseModel):
     title: str = Field(description="Title of the video")
@@ -59,6 +60,7 @@ class FreeResponseQuestion(BaseModel):
     sampleAnswer: str = Field(description="A complete sample correct answer")
     keyPoints: List[str] = Field(description="Key points that should be covered in a good answer")
     maxPoints: int = Field(default=3, description="Maximum points for this question")
+    relatedSubtopic: str = Field(default="", description="The subtopic this question primarily assesses")
 
 class ModuleQuizContent(BaseModel):
     title: str = Field(description="Title of the module quiz")
@@ -273,16 +275,41 @@ Only include videos that are directly educational and relevant to the topic."""
         with open(prompt_path, 'r') as f:
             return f.read()
 
+    def _format_weakness_context(self, previous_weakness_data: Optional[Dict]) -> str:
+        if not previous_weakness_data:
+            return ""
+        weak = previous_weakness_data.get("weak_subtopics", {})
+        last_score = previous_weakness_data.get("last_score", 0)
+        if not weak:
+            return ""
+        lines = [
+            "",
+            "**ADAPTIVE RETAKE INSTRUCTIONS:**",
+            f"This is a retake quiz. The student's most recent score was {last_score}%.",
+            "The student struggled with these subtopics (number = how many recent attempts missed it):"
+        ]
+        for subtopic, count in sorted(weak.items(), key=lambda x: -x[1]):
+            lines.append(f"  - {subtopic} (missed {count} time{'s' if count > 1 else ''})")
+        lines.append("")
+        lines.append("Please:")
+        lines.append("- Allocate MORE questions to the weak subtopics listed above.")
+        lines.append("- Generate ENTIRELY NEW questions — do not reuse questions from any previous quiz.")
+        lines.append("- Still cover all subtopics, but weight toward weak areas.")
+        return "\n".join(lines)
+
     def generate_module_quiz(self, course_title: str, unit_title: str, unit_description: str,
-                            subtopics: List[str], skill_level: str, age_group: str) -> Dict[str, Any]:
+                            subtopics: List[str], skill_level: str, age_group: str,
+                            previous_weakness_data: Optional[Dict] = None) -> Dict[str, Any]:
         system_template = self._load_module_quiz_prompt()
+        weakness_context = self._format_weakness_context(previous_weakness_data)
         formatted_prompt = system_template.format(
             course_title=course_title,
             unit_title=unit_title,
             unit_description=unit_description,
             subtopics="\n".join(f"- {s}" for s in subtopics),
             skill_level=skill_level,
-            age_group=age_group
+            age_group=age_group,
+            weakness_context=weakness_context
         )
 
         try:

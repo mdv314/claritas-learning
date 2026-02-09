@@ -52,13 +52,16 @@ export interface RecommendationResponse {
     stateStandardNote: string;
 }
 
-export type GradeLevel = 
-  | '1st Grade' | '2nd Grade' | '3rd Grade' | '4th Grade' | '5th Grade' 
-  | '6th Grade' | '7th Grade' | '8th Grade' | 'High School' | 'College';
+export type GradeLevel =
+  | '1st Grade' | '2nd Grade' | '3rd Grade' | '4th Grade' | '5th Grade'
+  | '6th Grade' | '7th Grade' | '8th Grade' | 'High School' | 'College'
+  | 'Early Career' | 'Mid Career' | 'Senior/Expert';
 
-export type Subject = 
-  | 'Mathematics' | 'Geometry' | 'Algebra' | 'Science' | 'Biology' 
+export type KnownSubject =
+  | 'Mathematics' | 'Geometry' | 'Algebra' | 'Science' | 'Biology'
   | 'Physics' | 'History' | 'Literature' | 'Computer Science';
+
+export type Subject = KnownSubject | (string & {});
 
 export interface AssessmentSubmission {
     subject: Subject;

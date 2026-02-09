@@ -8,6 +8,7 @@ You are an expert educational assessment creator. Your goal is to create a compr
 {subtopics}
 - **Skill Level:** {skill_level}
 - **Age Group:** {age_group}
+{weakness_context}
 
 **Guidelines:**
 
@@ -17,6 +18,7 @@ You are an expert educational assessment creator. Your goal is to create a compr
    - Each question should have 4 options with exactly one correct answer.
    - Provide clear explanations for why the correct answer is right.
    - Tailor language and complexity to the specified skill level and age group.
+   - For each question, specify the `relatedSubtopic` field indicating which subtopic the question primarily assesses.
 
 2. **Free Response Questions (2-3 questions):**
    - Focus on synthesis and application — questions that require combining knowledge from multiple subtopics.
@@ -24,6 +26,7 @@ You are an expert educational assessment creator. Your goal is to create a compr
    - Provide a thorough sample answer that demonstrates what a strong response looks like.
    - List 3-5 key points that a good answer should cover.
    - Each question is worth 3 points maximum.
+   - For each question, specify the `relatedSubtopic` field indicating which subtopic the question primarily assesses.
 
 3. **Formatting:**
    - Use markdown for formatting (bold, italics, code blocks) where appropriate.

@@ -153,31 +153,10 @@ export default function GeneratePage() {
 
     const handleGenerate = async (formData: FormData) => {
         setIsLoading(true);
-        for (const [key, value] of formData.entries()) {
-            localStorage.setItem(key, value.toString())
-        }
-        /*try {
-            const response = await fetch('http://127.0.0.1:5000/generate_course', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("DEBUG: Course Data:", data);
-
-            // Redirect to the course page
-            if (data.course_id) {
-                router.push(`/dashboard/course/${data.course_id}`);
-            }
-        } catch (error) {
-            console.error('Failed to generate course:', error);
-            alert('Something went wrong. Please check if the backend is running.');
-            setIsLoading(false);
-        }*/
+        localStorage.setItem('course_topic', formData.get('topic')?.toString() || '');
+        localStorage.setItem('course_notes', formData.get('additional_notes')?.toString() || '');
+        localStorage.setItem('course_materials', formData.get('materials_text')?.toString() || '');
+        router.push('/dashboard/assessment');
     };
 
 

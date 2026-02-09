@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { updateCourseProgress } from '@/services/apiService';
+import { updateCourseProgress, getModuleQuizStatus } from '@/services/apiService';
 
 // --- Types ---
 interface Quiz {
@@ -40,6 +40,13 @@ interface CourseProgress {
     lastVisited: string | null; // Format: "unitNumber-subtopicIndex"
 }
 
+interface UnitQuizStatus {
+    unitNumber: number;
+    passed: boolean;
+    bestPercentage: number;
+    attemptCount: number;
+}
+
 const getProgress = (courseId: string): CourseProgress => {
     if (typeof window === 'undefined') {
         return { isEnrolled: false, completedTopics: [], lastVisited: null };
@@ -71,6 +78,7 @@ function ModulePageContent() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [quizStatuses, setQuizStatuses] = useState<UnitQuizStatus[]>([]);
 
     // Fetch course data
     useEffect(() => {
@@ -100,6 +108,13 @@ function ModulePageContent() {
         };
 
         fetchCourse();
+
+        // Fetch quiz statuses (non-blocking)
+        if (courseId) {
+            getModuleQuizStatus(courseId)
+                .then(data => setQuizStatuses(data.units || []))
+                .catch(() => {});
+        }
     }, [courseId]);
 
     const unit = course?.units.find(u => u.unitNumber === unitNumber);
@@ -112,6 +127,10 @@ function ModulePageContent() {
         if (!unit) return { completed: 0, total: 0 };
         const completed = unit.subtopics.filter((_, idx) => isTopicCompleted(idx)).length;
         return { completed, total: unit.subtopics.length };
+    };
+
+    const getUnitQuizStatus = (un: number): UnitQuizStatus | undefined => {
+        return quizStatuses.find(s => s.unitNumber === un);
     };
 
     const syncProgress = (courseId: string, prog: CourseProgress) => {
@@ -149,6 +168,7 @@ function ModulePageContent() {
 
     const backUrl = courseId ? `/dashboard/course/${courseId}` : '/dashboard';
     const moduleProgress = getModuleProgress();
+    const currentQuizStatus = getUnitQuizStatus(unitNumber);
 
     if (loading) {
         return (
@@ -210,7 +230,9 @@ function ModulePageContent() {
                                     const completedInUnit = u.subtopics.filter((_, idx) =>
                                         progress.completedTopics.includes(`${u.unitNumber}-${idx}`)
                                     ).length;
-                                    const allCompleted = completedInUnit === u.subtopics.length;
+                                    const allTopicsDone = completedInUnit === u.subtopics.length;
+                                    const unitQuiz = getUnitQuizStatus(u.unitNumber);
+                                    const moduleComplete = allTopicsDone && unitQuiz?.passed;
 
                                     return (
                                         <button
@@ -219,13 +241,13 @@ function ModulePageContent() {
                                             className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${isActive ? 'bg-blue-50 border-l-2 border-blue-600' : ''}`}
                                         >
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                                                allCompleted
+                                                moduleComplete
                                                     ? 'bg-green-500 text-white'
                                                     : isActive
                                                         ? 'bg-blue-600 text-white'
                                                         : 'bg-gray-200 text-gray-600'
                                             }`}>
-                                                {allCompleted ? (
+                                                {moduleComplete ? (
                                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                                     </svg>
@@ -342,20 +364,52 @@ function ModulePageContent() {
                             </div>
                             <div className="p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                        currentQuizStatus?.passed
+                                            ? 'bg-green-100'
+                                            : currentQuizStatus && !currentQuizStatus.passed
+                                                ? 'bg-yellow-100'
+                                                : 'bg-blue-100'
+                                    }`}>
+                                        {currentQuizStatus?.passed ? (
+                                            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        )}
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="font-semibold text-gray-900">{unit.quiz.title}</h3>
-                                        <p className="text-sm text-gray-500">{unit.quiz.questionCount} questions</p>
+                                        <p className="text-sm text-gray-500">
+                                            {unit.quiz.questionCount} questions
+                                            {currentQuizStatus && (
+                                                <> &middot; Best: {Math.round(currentQuizStatus.bestPercentage)}% &middot; {currentQuizStatus.attemptCount} attempt{currentQuizStatus.attemptCount !== 1 ? 's' : ''}</>
+                                            )}
+                                        </p>
+                                        {currentQuizStatus?.passed && (
+                                            <span className="inline-block mt-1 text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">PASSED</span>
+                                        )}
+                                        {currentQuizStatus && !currentQuizStatus.passed && (
+                                            <span className="inline-block mt-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">NOT PASSED (80% required)</span>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => router.push(`/dashboard/course/quiz?courseId=${courseId}&unitNumber=${unitNumber}`)}
-                                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                        className={`px-4 py-2 font-medium rounded-lg transition-colors ${
+                                            currentQuizStatus?.passed
+                                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
                                     >
-                                        Start Quiz
+                                        {currentQuizStatus?.passed
+                                            ? 'Review Quiz'
+                                            : currentQuizStatus
+                                                ? 'Retake Quiz'
+                                                : 'Start Quiz'
+                                        }
                                     </button>
                                 </div>
                             </div>

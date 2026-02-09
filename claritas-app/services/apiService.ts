@@ -28,7 +28,7 @@ export const generateCourse = async (profile: PreferenceProfile): Promise<any> =
 
 export const createUser = async (userCreation: UserInformation, userPreferences: UserPreferences): Promise<any> => {
     console.log(userCreation)
-    const response = await fetch(`api/signup`, {
+    const response = await fetch(`/api/signup`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -45,7 +45,7 @@ export const createUser = async (userCreation: UserInformation, userPreferences:
 
 export const loginUser = async (loginAttempt: LoginInfo): Promise<AuthResponse> => {
     console.log(loginAttempt)
-    const response = await fetch('api/login', {
+    const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -105,6 +105,43 @@ export const evaluateAssessment = async (grade: GradeLevel, subject: Subject, re
 
     return response.json();
 }
+
+export const generateCourseFromAssessment = async (
+    topic: string,
+    masteryLevel: string,
+    grade: string,
+    assessmentResults: {
+        score: number;
+        strengths: string[];
+        weaknesses: string[];
+        recommendation: string;
+    }
+): Promise<any> => {
+    const formData = new FormData();
+    formData.append('topic', topic);
+    formData.append('skill_level', masteryLevel);
+    formData.append('age_group', grade);
+    formData.append(
+        'additional_notes',
+        `Assessment Results: Score ${Math.round(assessmentResults.score)}%. ` +
+        `Mastery Level: ${masteryLevel}. ` +
+        `Strengths: ${assessmentResults.strengths.join(', ')}. ` +
+        `Weaknesses: ${assessmentResults.weaknesses.join(', ')}. ` +
+        `Recommendation: ${assessmentResults.recommendation}`
+    );
+    formData.append('materials_text', `Areas needing focus: ${assessmentResults.weaknesses.join(', ')}`);
+
+    const response = await fetch(`${API_BASE_URL}/generate_course`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+    }
+
+    return response.json();
+};
 
 export const enrollInCourse = async (courseId: string): Promise<any> => {
     const response = await fetch('/api/enroll', {
@@ -206,6 +243,65 @@ export const evaluateModuleQuiz = async (
     });
     if (!response.ok) {
         throw new Error(`Backend error: ${response.statusText}`);
+    }
+    return response.json();
+};
+
+export const evaluateModuleQuizAuth = async (
+    courseId: string,
+    unitNumber: number,
+    mcqAnswers: number[],
+    frqAnswers: string[]
+): Promise<any> => {
+    const response = await fetch('/api/evaluate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ courseId, unitNumber, mcqAnswers, frqAnswers }),
+    });
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+    return response.json();
+};
+
+export const generateModuleQuizRetake = async (
+    courseId: string,
+    unitNumber: number
+): Promise<any> => {
+    const response = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ courseId, unitNumber, retake: true }),
+    });
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+    return response.json();
+};
+
+export const getQuizAttempts = async (
+    courseId: string,
+    unitNumber: number
+): Promise<any> => {
+    const response = await fetch(`/api/quiz-attempts?courseId=${courseId}&unitNumber=${unitNumber}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+    return response.json();
+};
+
+export const getModuleQuizStatus = async (courseId: string): Promise<any> => {
+    const response = await fetch(`/api/quiz-status?courseId=${courseId}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
     }
     return response.json();
 };

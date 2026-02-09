@@ -273,8 +273,13 @@ def generate_assessment(selectedOptions: SelectedOptions):
             subject=selectedOptions.subject,
             grade_level=selectedOptions.gradeLevel
         )
-        
+
+        if "error" in assessment_dict:
+            raise HTTPException(status_code=503, detail=assessment_dict["error"])
+
         return assessment_dict['questions']
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -287,8 +292,11 @@ def evaluate_assessment(quiz_attempt: QuizAttempt):
     evaluation = assessment_generator.evaluate_quiz(
         subject=quiz_attempt.subject,
         grade_level=quiz_attempt.gradeLevel,
-        results_input=[r.dict() for r in quiz_attempt.results]
+        results_input=[r.model_dump() for r in quiz_attempt.results]
     )
+
+    if "error" in evaluation:
+        raise HTTPException(status_code=503, detail=evaluation["error"])
 
     evaluation["score"] = score
     evaluation["masteryLevel"] = mastery_from_score(score)
@@ -335,10 +343,12 @@ def get_user_info():
 class ModuleQuizRequest(BaseModel):
     courseId: str
     unitNumber: int
+    retake: bool = False
+    auth_id: Optional[str] = None
 
 @app.post("/generate_module_quiz")
 async def generate_module_quiz(request: ModuleQuizRequest):
-    """Generate or retrieve a cached module-level quiz."""
+    """Generate or retrieve a cached module-level quiz. Supports adaptive retakes."""
     try:
         filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
         if not os.path.exists(filepath):
@@ -348,10 +358,11 @@ async def generate_module_quiz(request: ModuleQuizRequest):
             course_data = json.load(f)
         course_plan = course_data["course_plan"]
 
-        # Check cache
         quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
         quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
-        if os.path.exists(quiz_filepath):
+
+        # If not a retake, check cache
+        if not request.retake and os.path.exists(quiz_filepath):
             with open(quiz_filepath, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
@@ -360,13 +371,38 @@ async def generate_module_quiz(request: ModuleQuizRequest):
         if not unit:
             raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
 
+        # For retakes, gather weakness data from past attempts
+        previous_weakness_data = None
+        if request.retake and request.auth_id:
+            try:
+                attempts = supabase.table("quiz_attempts").select("weak_subtopics,percentage").eq(
+                    "auth_id", request.auth_id
+                ).eq("course_id", request.courseId).eq(
+                    "unit_number", request.unitNumber
+                ).order("attempt_number", desc=True).limit(3).execute()
+
+                if attempts.data:
+                    # Aggregate weak subtopics with frequency
+                    subtopic_counts = {}
+                    for attempt in attempts.data:
+                        for st in attempt.get("weak_subtopics", []):
+                            subtopic_counts[st] = subtopic_counts.get(st, 0) + 1
+                    if subtopic_counts:
+                        previous_weakness_data = {
+                            "weak_subtopics": subtopic_counts,
+                            "last_score": attempts.data[0].get("percentage", 0)
+                        }
+            except Exception as e:
+                print(f"Warning: Failed to fetch weakness data: {e}")
+
         result = course_generator.generate_module_quiz(
             course_title=course_plan.get("courseTitle"),
             unit_title=unit.get("title"),
             unit_description=unit.get("description", ""),
             subtopics=unit.get("subtopics", []),
             skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
-            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
+            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult"),
+            previous_weakness_data=previous_weakness_data
         )
 
         if "error" in result:
@@ -388,6 +424,7 @@ class EvaluateQuizRequest(BaseModel):
     unitNumber: int
     mcqAnswers: List[int]
     frqAnswers: List[str]
+    auth_id: Optional[str] = None
 
 @app.post("/evaluate_module_quiz")
 async def evaluate_module_quiz(request: EvaluateQuizRequest):
@@ -423,7 +460,8 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
                 "selectedIndex": selected,
                 "correctAnswerIndex": q["correctAnswerIndex"],
                 "explanation": q["explanation"],
-                "correct": correct
+                "correct": correct,
+                "relatedSubtopic": q.get("relatedSubtopic", "")
             })
 
         # Evaluate FRQ via Gemini
@@ -442,6 +480,62 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
         # Calculate scores
         frq_score = sum(e["score"] for e in eval_result.get("frqEvaluations", []))
         frq_total = sum(q.get("maxPoints", 3) for q in frq_questions)
+        total_score = mcq_score + frq_score
+        total_possible = len(mcq_questions) + frq_total
+        percentage = round((total_score / total_possible) * 100, 1) if total_possible > 0 else 0
+        passed = percentage >= 80
+
+        # Collect weak subtopics from incorrect answers
+        weak_subtopics = []
+        for r in mcq_results:
+            if not r["correct"] and r["relatedSubtopic"]:
+                weak_subtopics.append(r["relatedSubtopic"])
+        for i, ev in enumerate(eval_result.get("frqEvaluations", [])):
+            if i < len(frq_questions):
+                q = frq_questions[i]
+                if ev["score"] < ev["maxPoints"] * 0.8 and q.get("relatedSubtopic"):
+                    weak_subtopics.append(q["relatedSubtopic"])
+        # Deduplicate
+        weak_subtopics = list(dict.fromkeys(weak_subtopics))
+
+        # Store results in Supabase if auth_id is provided
+        attempt_number = 1
+        if request.auth_id:
+            try:
+                # Get latest attempt number
+                existing = supabase.table("quiz_attempts").select("attempt_number").eq(
+                    "auth_id", request.auth_id
+                ).eq("course_id", request.courseId).eq(
+                    "unit_number", request.unitNumber
+                ).order("attempt_number", desc=True).limit(1).execute()
+
+                if existing.data:
+                    attempt_number = existing.data[0]["attempt_number"] + 1
+
+                frq_evaluations = eval_result.get("frqEvaluations", [])
+
+                supabase.table("quiz_attempts").insert({
+                    "auth_id": request.auth_id,
+                    "course_id": request.courseId,
+                    "unit_number": request.unitNumber,
+                    "attempt_number": attempt_number,
+                    "mcq_score": mcq_score,
+                    "mcq_total": len(mcq_questions),
+                    "frq_score": frq_score,
+                    "frq_total": frq_total,
+                    "total_score": total_score,
+                    "total_possible": total_possible,
+                    "percentage": percentage,
+                    "passed": passed,
+                    "mcq_results": mcq_results,
+                    "frq_evaluations": frq_evaluations,
+                    "weak_subtopics": weak_subtopics,
+                    "overall_feedback": eval_result.get("overallFeedback", "")
+                }).execute()
+                print(f"Quiz attempt #{attempt_number} stored for user {request.auth_id}")
+            except Exception as store_err:
+                print(f"Warning: Failed to store quiz attempt: {store_err}")
+                # Non-blocking: still return results
 
         return {
             "mcqResults": mcq_results,
@@ -452,8 +546,12 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
             "frqAnswers": request.frqAnswers,
             "frqScore": frq_score,
             "frqTotal": frq_total,
-            "totalScore": mcq_score + frq_score,
-            "totalPossible": len(mcq_questions) + frq_total,
+            "totalScore": total_score,
+            "totalPossible": total_possible,
+            "percentage": percentage,
+            "passed": passed,
+            "attemptNumber": attempt_number,
+            "weakSubtopics": weak_subtopics,
             "overallFeedback": eval_result.get("overallFeedback", "")
         }
 
@@ -461,6 +559,54 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
         raise he
     except Exception as e:
         print(f"Error in evaluate_module_quiz: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+################################
+# QUIZ ATTEMPTS & STATUS      #
+################################
+
+@app.get("/quiz_attempts/{course_id}/{unit_number}")
+async def get_quiz_attempts(course_id: str, unit_number: int, auth_id: str):
+    """Return all quiz attempts for a user/course/unit."""
+    try:
+        result = supabase.table("quiz_attempts").select(
+            "attempt_number,percentage,passed,mcq_score,mcq_total,frq_score,frq_total,total_score,total_possible,weak_subtopics,overall_feedback,created_at"
+        ).eq("auth_id", auth_id).eq("course_id", course_id).eq(
+            "unit_number", unit_number
+        ).order("attempt_number", desc=False).execute()
+        return {"attempts": result.data}
+    except Exception as e:
+        print(f"Error fetching quiz attempts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/module_quiz_status/{course_id}")
+async def get_module_quiz_status(course_id: str, auth_id: str):
+    """Return per-unit quiz pass/fail status for a course."""
+    try:
+        result = supabase.table("quiz_attempts").select(
+            "unit_number,attempt_number,percentage,passed"
+        ).eq("auth_id", auth_id).eq("course_id", course_id).execute()
+
+        # Aggregate per unit
+        units_status = {}
+        for row in result.data:
+            un = row["unit_number"]
+            if un not in units_status:
+                units_status[un] = {
+                    "unitNumber": un,
+                    "passed": False,
+                    "bestPercentage": 0,
+                    "attemptCount": 0
+                }
+            units_status[un]["attemptCount"] += 1
+            if row["percentage"] > units_status[un]["bestPercentage"]:
+                units_status[un]["bestPercentage"] = row["percentage"]
+            if row["passed"]:
+                units_status[un]["passed"] = True
+
+        return {"units": list(units_status.values())}
+    except Exception as e:
+        print(f"Error fetching quiz status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 ################################
@@ -544,16 +690,34 @@ async def update_progress(request: UpdateProgressRequest):
     if not existing.data:
         raise HTTPException(status_code=404, detail="Not enrolled in this course")
 
-    # Compute is_completed by comparing to total topics in course JSON
+    # Compute is_completed by comparing to total topics AND quiz passes
     is_completed = False
     filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
     if os.path.exists(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             course_data = json.load(f)
         plan = course_data.get("course_plan", {})
-        total_topics = sum(len(u.get("subtopics", [])) for u in plan.get("units", []))
-        if total_topics > 0 and len(request.completed_topics) >= total_topics:
-            is_completed = True
+        units = plan.get("units", [])
+        total_topics = sum(len(u.get("subtopics", [])) for u in units)
+        all_topics_done = total_topics > 0 and len(request.completed_topics) >= total_topics
+
+        # Check if all units have a passing quiz attempt (>=80%)
+        all_quizzes_passed = False
+        if all_topics_done:
+            try:
+                quiz_results = supabase.table("quiz_attempts").select(
+                    "unit_number,passed"
+                ).eq("auth_id", request.auth_id).eq(
+                    "course_id", request.course_id
+                ).eq("passed", True).execute()
+
+                passed_units = set(r["unit_number"] for r in quiz_results.data)
+                all_unit_numbers = set(u.get("unitNumber") for u in units)
+                all_quizzes_passed = all_unit_numbers.issubset(passed_units)
+            except Exception as e:
+                print(f"Warning: Failed to check quiz passes: {e}")
+
+        is_completed = all_topics_done and all_quizzes_passed
 
     update_data = {
         "completed_topics": request.completed_topics,
@@ -568,137 +732,6 @@ async def update_progress(request: UpdateProgressRequest):
 
     return {"message": "Progress updated", "data": result.data}
 
-
-class ModuleQuizRequest(BaseModel):
-    courseId: str
-    unitNumber: int
-
-@app.post("/generate_module_quiz")
-async def generate_module_quiz(request: ModuleQuizRequest):
-    """Generate or retrieve a cached module-level quiz."""
-    try:
-        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        if not os.path.exists(filepath):
-            raise HTTPException(status_code=404, detail="Course not found")
-
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
-        course_plan = course_data["course_plan"]
-
-        # Check cache
-        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
-        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
-        if os.path.exists(quiz_filepath):
-            with open(quiz_filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
-
-        # Find the unit
-        unit = next((u for u in course_plan.get("units", []) if u.get("unitNumber") == request.unitNumber), None)
-        if not unit:
-            raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
-
-        result = course_generator.generate_module_quiz(
-            course_title=course_plan.get("courseTitle"),
-            unit_title=unit.get("title"),
-            unit_description=unit.get("description", ""),
-            subtopics=unit.get("subtopics", []),
-            skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
-            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
-        )
-
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-
-        with open(quiz_filepath, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-
-        return result
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Error in generate_module_quiz: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-class EvaluateQuizRequest(BaseModel):
-    courseId: str
-    unitNumber: int
-    mcqAnswers: List[int]
-    frqAnswers: List[str]
-
-@app.post("/evaluate_module_quiz")
-async def evaluate_module_quiz(request: EvaluateQuizRequest):
-    """Evaluate a student's module quiz answers. MCQ scored locally, FRQ scored by Gemini."""
-    try:
-        # Load the quiz
-        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
-        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
-        if not os.path.exists(quiz_filepath):
-            raise HTTPException(status_code=404, detail="Quiz not found. Generate it first.")
-
-        with open(quiz_filepath, 'r', encoding='utf-8') as f:
-            quiz_data = json.load(f)
-
-        # Load course plan for metadata
-        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
-        course_plan = course_data["course_plan"]
-
-        # Score MCQ
-        mcq_questions = quiz_data.get("multipleChoice", [])
-        mcq_score = 0
-        mcq_results = []
-        for i, q in enumerate(mcq_questions):
-            selected = request.mcqAnswers[i] if i < len(request.mcqAnswers) else -1
-            correct = selected == q.get("correctAnswerIndex")
-            if correct:
-                mcq_score += 1
-            mcq_results.append({
-                "question": q["question"],
-                "options": q["options"],
-                "selectedIndex": selected,
-                "correctAnswerIndex": q["correctAnswerIndex"],
-                "explanation": q["explanation"],
-                "correct": correct
-            })
-
-        # Evaluate FRQ via Gemini
-        frq_questions = quiz_data.get("freeResponse", [])
-        eval_result = course_generator.evaluate_module_quiz(
-            frq_questions=frq_questions,
-            frq_answers=request.frqAnswers,
-            skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
-            age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
-        )
-        print(f"FRQ Evaluation Result: {eval_result}")
-
-        if "error" in eval_result:
-            raise HTTPException(status_code=500, detail=eval_result["error"])
-
-        # Calculate scores
-        frq_score = sum(e["score"] for e in eval_result.get("frqEvaluations", []))
-        frq_total = sum(q.get("maxPoints", 3) for q in frq_questions)
-
-        return {
-            "mcqResults": mcq_results,
-            "mcqScore": mcq_score,
-            "mcqTotal": len(mcq_questions),
-            "frqEvaluations": eval_result.get("frqEvaluations", []),
-            "frqQuestions": frq_questions,
-            "frqAnswers": request.frqAnswers,
-            "frqScore": frq_score,
-            "frqTotal": frq_total,
-            "totalScore": mcq_score + frq_score,
-            "totalPossible": len(mcq_questions) + frq_total,
-            "overallFeedback": eval_result.get("overallFeedback", "")
-        }
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Error in evaluate_module_quiz: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 ################################
 # QUIZ HELP (SOCRATIC TUTOR)  #

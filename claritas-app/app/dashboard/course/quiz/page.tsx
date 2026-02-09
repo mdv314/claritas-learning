@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import QuizHelpPanel from '@/components/QuizHelpPanel';
+import { evaluateModuleQuizAuth, generateModuleQuizRetake, getQuizAttempts } from '@/services/apiService';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -70,7 +71,24 @@ interface EvaluationResult {
     frqTotal: number;
     totalScore: number;
     totalPossible: number;
+    percentage: number;
+    passed: boolean;
+    attemptNumber: number;
+    weakSubtopics: string[];
     overallFeedback: string;
+}
+
+interface QuizAttempt {
+    attempt_number: number;
+    percentage: number;
+    passed: boolean;
+    mcq_score: number;
+    mcq_total: number;
+    frq_score: number;
+    frq_total: number;
+    total_score: number;
+    total_possible: number;
+    created_at: string;
 }
 
 function QuizPageContent() {
@@ -95,6 +113,10 @@ function QuizPageContent() {
     const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
     const [activeQuestionType, setActiveQuestionType] = useState<"mcq" | "frq">("mcq");
 
+    // Attempt history state
+    const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+    const [retaking, setRetaking] = useState(false);
+
     const openHelp = (index: number, type: "mcq" | "frq") => {
         setActiveQuestionIndex(index);
         setActiveQuestionType(type);
@@ -105,6 +127,7 @@ function QuizPageContent() {
         ? `/dashboard/course/module?courseId=${courseId}&unit=${unitNumber}`
         : '/dashboard';
 
+    // Fetch quiz and attempt history
     useEffect(() => {
         if (!courseId || !unitNumber) return;
         const fetchQuiz = async () => {
@@ -123,6 +146,11 @@ function QuizPageContent() {
             }
         };
         fetchQuiz();
+
+        // Fetch attempt history (non-blocking)
+        getQuizAttempts(courseId, parseInt(unitNumber))
+            .then(data => setAttempts(data.attempts || []))
+            .catch(() => {}); // Silently fail if not authenticated
     }, [courseId, unitNumber]);
 
     const allAnswered = quiz
@@ -136,18 +164,32 @@ function QuizPageContent() {
         try {
             const mcqArr = quiz.multipleChoice.map((_, i) => mcqAnswers[i] ?? -1);
             const frqArr = quiz.freeResponse.map((_, i) => frqAnswers[i] || '');
-            const res = await fetch('http://127.0.0.1:5000/evaluate_module_quiz', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    courseId,
-                    unitNumber: parseInt(unitNumber),
-                    mcqAnswers: mcqArr,
-                    frqAnswers: frqArr
-                })
-            });
-            if (!res.ok) throw new Error(await res.text() || 'Failed to evaluate quiz');
-            setResults(await res.json());
+
+            // Try authenticated route first, fall back to direct backend
+            let data;
+            try {
+                data = await evaluateModuleQuizAuth(courseId, parseInt(unitNumber), mcqArr, frqArr);
+            } catch {
+                // Fallback to direct backend (no result storage)
+                const res = await fetch('http://127.0.0.1:5000/evaluate_module_quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        courseId,
+                        unitNumber: parseInt(unitNumber),
+                        mcqAnswers: mcqArr,
+                        frqAnswers: frqArr
+                    })
+                });
+                if (!res.ok) throw new Error(await res.text() || 'Failed to evaluate quiz');
+                data = await res.json();
+            }
+            setResults(data);
+
+            // Refresh attempt history
+            getQuizAttempts(courseId, parseInt(unitNumber))
+                .then(d => setAttempts(d.attempts || []))
+                .catch(() => {});
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Evaluation failed');
         } finally {
@@ -155,7 +197,37 @@ function QuizPageContent() {
         }
     };
 
-    if (loading) {
+    const handleRetake = async () => {
+        if (!courseId || !unitNumber) return;
+        setRetaking(true);
+        setResults(null);
+        setMcqAnswers({});
+        setFrqAnswers({});
+        setError(null);
+        try {
+            // Try authenticated retake (adaptive)
+            let data;
+            try {
+                data = await generateModuleQuizRetake(courseId, parseInt(unitNumber));
+            } catch {
+                // Fallback: generate fresh quiz without weakness data
+                const res = await fetch('http://127.0.0.1:5000/generate_module_quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ courseId, unitNumber: parseInt(unitNumber), retake: true })
+                });
+                if (!res.ok) throw new Error(await res.text() || 'Failed to generate retake quiz');
+                data = await res.json();
+            }
+            setQuiz(data);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to generate retake quiz');
+        } finally {
+            setRetaking(false);
+        }
+    };
+
+    if (loading || retaking) {
         return (
             <div className="min-h-screen bg-[#fafafa]">
                 <Header />
@@ -168,7 +240,9 @@ function QuizPageContent() {
                             <div className="h-4 bg-gray-200 rounded w-full"></div>
                             <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                         </div>
-                        <p className="mt-8 text-gray-500 font-medium">Generating your module quiz...</p>
+                        <p className="mt-8 text-gray-500 font-medium">
+                            {retaking ? 'Generating your adaptive retake quiz...' : 'Generating your module quiz...'}
+                        </p>
                         <p className="text-sm text-gray-400 mt-2">This may take a few seconds.</p>
                     </div>
                 </div>
@@ -195,9 +269,10 @@ function QuizPageContent() {
 
     // Results view
     if (results) {
-        const pct = Math.round((results.totalScore / results.totalPossible) * 100);
-        const scoreColor = pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-yellow-600' : 'text-red-600';
-        const scoreBg = pct >= 80 ? 'bg-green-50 border-green-200' : pct >= 60 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+        const pct = results.percentage ?? Math.round((results.totalScore / results.totalPossible) * 100);
+        const passed = results.passed ?? pct >= 80;
+        const scoreColor = passed ? 'text-green-600' : pct >= 60 ? 'text-yellow-600' : 'text-red-600';
+        const scoreBg = passed ? 'bg-green-50 border-green-200' : pct >= 60 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
 
         return (
             <div className="min-h-screen bg-[#fafafa]">
@@ -220,6 +295,32 @@ function QuizPageContent() {
                             <span>MCQ: {results.mcqScore}/{results.mcqTotal}</span>
                             <span>Free Response: {results.frqScore}/{results.frqTotal}</span>
                         </div>
+
+                        {/* Pass/Fail message */}
+                        <div className={`mt-4 p-4 rounded-xl ${passed ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}`}>
+                            {passed ? (
+                                <div className="flex items-center gap-3">
+                                    <svg className="w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-bold text-green-800">Congratulations! You passed!</p>
+                                        <p className="text-sm text-green-700">You scored {pct}%, meeting the 80% passing threshold. This module is now complete.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <svg className="w-6 h-6 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="font-bold text-red-800">Not quite there yet</p>
+                                        <p className="text-sm text-red-700">You need at least 80% to pass. Review the feedback below and try again.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {results.overallFeedback && (
                             <p className="mt-4 text-gray-700 leading-relaxed">{results.overallFeedback}</p>
                         )}
@@ -286,11 +387,55 @@ function QuizPageContent() {
                         </div>
                     </div>
 
-                    <div className="text-center">
+                    {/* Attempt History */}
+                    {attempts.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-8">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-6">Attempt History</h2>
+                            <div className="space-y-3">
+                                {attempts.map((a) => (
+                                    <div key={a.attempt_number} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm font-bold text-gray-500">#{a.attempt_number}</span>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {a.total_score}/{a.total_possible} points ({Math.round(a.percentage)}%)
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    {new Date(a.created_at).toLocaleDateString()} at {new Date(a.created_at).toLocaleTimeString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                                            a.passed
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-red-100 text-red-700'
+                                        }`}>
+                                            {a.passed ? 'PASSED' : 'FAILED'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="text-center flex items-center justify-center gap-4">
+                        {!passed && (
+                            <button
+                                onClick={handleRetake}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                            >
+                                Retake Quiz
+                            </button>
+                        )}
                         <Link href={backUrl} className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-black font-medium transition-colors">
                             Back to Module
                         </Link>
                     </div>
+                    {!passed && (
+                        <p className="text-center text-sm text-gray-500 mt-3">
+                            The retake quiz will adapt to focus on your weak areas.
+                        </p>
+                    )}
                 </div>
             </div>
         );

@@ -1,7 +1,8 @@
 'use client'
 import React, { useEffect, useState } from "react"
+import { useRouter } from "next/navigation";
 import { CalibrationResult, GradeLevel, Question, Result, Subject, UserAnswer } from "@/types";
-import { evaluateAssessment, generateAssessmentQuestions } from "@/services/apiService";
+import { evaluateAssessment, generateAssessmentQuestions, generateCourseFromAssessment } from "@/services/apiService";
 import AssessmentResults from "@/components/AssessmentResults";
 import AssessmentSelector from "@/components/AssessmentSelector";
 import StepIndicator from "@/components/StepIndicator";
@@ -16,23 +17,25 @@ enum AppState {
 
 /* Temporarily taking fake inputs to create self assessment test, connect it with user creation and preferences */
 const AssessmentPage: React.FC = () => {
+    const router = useRouter();
     const [appState, setAppState] = useState<AppState>(AppState.SETUP);
-    const [grade, setGrade] = useState<GradeLevel>('4th Grade');   
+    const [grade, setGrade] = useState<GradeLevel>('4th Grade');
     const [subject, setSubject] = useState<Subject>('Geometry');
+    const [customTopic, setCustomTopic] = useState<string | undefined>();
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
     const [calibrationResult, setCalibrationResult] = useState<CalibrationResult | null>(null);
     const currentStep = appState;
 
     useEffect(() => {
       const topic = localStorage.getItem("course_topic");
-      const notes = localStorage.getItem("course_notes");
-      const materials = localStorage.getItem("course_materials");
-    
+
       if (topic) {
         setSubject(topic as Subject);
+        setCustomTopic(topic);
       }
-  
+
     }, []);
 
     const handleStartAssessment = async () => {
@@ -82,6 +85,36 @@ const AssessmentPage: React.FC = () => {
         setQuestions([]);
         setCalibrationResult(null);
       };
+
+      const handleGenerateCourse = async () => {
+        if (!calibrationResult) return;
+        setIsGeneratingCourse(true);
+        try {
+          const topic = localStorage.getItem("course_topic") || subject;
+          const result = await generateCourseFromAssessment(
+            topic,
+            calibrationResult.masteryLevel,
+            grade,
+            {
+              score: calibrationResult.score,
+              strengths: calibrationResult.strengths,
+              weaknesses: calibrationResult.weaknesses,
+              recommendation: calibrationResult.recommendation,
+            }
+          );
+          const courseId = result.course_id || result.courseId;
+          if (courseId) {
+            router.push(`/dashboard/course/${courseId}`);
+          } else {
+            alert("Course was generated but no course ID was returned.");
+          }
+        } catch (error) {
+          console.error(error);
+          alert("Failed to generate course. Please try again.");
+        } finally {
+          setIsGeneratingCourse(false);
+        }
+      };
     
     
     return (
@@ -95,6 +128,18 @@ const AssessmentPage: React.FC = () => {
             <StepIndicator currentStep={currentStep} />
 
             <main className="transition-all duration-500 transform">
+
+            {appState === AppState.SETUP && (
+                <AssessmentSelector
+                  grade={grade}
+                  subject={subject}
+                  customTopic={customTopic}
+                  onGradeChange={setGrade}
+                  onSubjectChange={setSubject}
+                  onSubmit={handleStartAssessment}
+                  isLoading={isGenerating}
+                />
+            )}
 
             {appState === AppState.QUIZ && (
                 <AssessmentQuiz 
@@ -121,11 +166,13 @@ const AssessmentPage: React.FC = () => {
             )}
 
             {appState === AppState.RESULTS && calibrationResult && (
-                <AssessmentResults 
-                result={calibrationResult} 
-                subject={subject} 
-                grade={grade} 
+                <AssessmentResults
+                result={calibrationResult}
+                subject={subject}
+                grade={grade}
                 onReset={reset}
+                onGenerateCourse={handleGenerateCourse}
+                isGeneratingCourse={isGeneratingCourse}
                 />
             )}
             </main>

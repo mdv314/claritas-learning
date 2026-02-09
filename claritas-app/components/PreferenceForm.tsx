@@ -44,7 +44,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
     const router = useRouter();
     const session = useContext(SessionContext);
 
-    const totalSteps = 4;
+    const totalSteps = 3;
     const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps + 1));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
@@ -128,7 +128,7 @@ const PreferenceForm: React.FC<Props> = ({ onComplete, onProcessingChange }) => 
                     ))}
                 </div>
                 <div className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">
-                    Profile: {Math.round((step / (totalSteps - 1)) * 100)}% Complete
+                    Profile: {Math.round((step / totalSteps) * 100)}% Complete
                 </div>
             </div>
 

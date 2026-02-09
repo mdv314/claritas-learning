@@ -1,29 +1,38 @@
 
 import React from 'react';
-import { GradeLevel, Subject } from '../types';
+import { GradeLevel, KnownSubject, Subject } from '../types';
 
 interface SubjectGradeSelectorProps {
   grade: GradeLevel;
   subject: Subject;
+  customTopic?: string;
   onGradeChange: (grade: GradeLevel) => void;
   onSubjectChange: (subject: Subject) => void;
   onSubmit: () => void;
   isLoading: boolean;
 }
 
-const grades: GradeLevel[] = [
-  '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', 
-  '6th Grade', '7th Grade', '8th Grade', 'High School', 'College'
+const grades: { label: string; items: GradeLevel[] }[] = [
+  {
+    label: 'K-12',
+    items: ['1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade',
+      '6th Grade', '7th Grade', '8th Grade', 'High School'],
+  },
+  {
+    label: 'Higher Education & Professional',
+    items: ['College', 'Early Career', 'Mid Career', 'Senior/Expert'],
+  },
 ];
 
-const subjects: Subject[] = [
-  'Mathematics', 'Geometry', 'Algebra', 'Science', 'Biology', 
+const knownSubjects: KnownSubject[] = [
+  'Mathematics', 'Geometry', 'Algebra', 'Science', 'Biology',
   'Physics', 'History', 'Literature', 'Computer Science'
 ];
 
-const AssessmentSelector: React.FC<SubjectGradeSelectorProps> = ({ 
-  grade, subject, onGradeChange, onSubjectChange, onSubmit, isLoading 
+const AssessmentSelector: React.FC<SubjectGradeSelectorProps> = ({
+  grade, subject, customTopic, onGradeChange, onSubjectChange, onSubmit, isLoading
 }) => {
+  const isCustomTopic = customTopic && !knownSubjects.includes(customTopic as KnownSubject);
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl mx-auto w-full border border-slate-100">
       <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Start Your Assessment</h2>
@@ -34,34 +43,56 @@ const AssessmentSelector: React.FC<SubjectGradeSelectorProps> = ({
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Grade Level</label>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {grades.map((g) => (
-              <button
-                key={g}
-                onClick={() => onGradeChange(g)}
-                className={`py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                  grade === g 
-                    ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' 
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Experience Level</label>
+          {grades.map((group) => (
+            <div key={group.label} className="mb-3">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">{group.label}</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {group.items.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => onGradeChange(g)}
+                    className={`py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                      grade === g
+                        ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">Subject</label>
+
+          {isCustomTopic && (
+            <div className="mb-4">
+              <button
+                onClick={() => onSubjectChange(customTopic)}
+                className={`w-full py-3 px-4 rounded-lg text-sm font-bold transition-all ${
+                  subject === customTopic
+                    ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                {customTopic}
+              </button>
+              <p className="text-xs text-slate-400 mt-3 mb-1">Or choose a common subject:</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {subjects.map((s) => (
+            {knownSubjects.map((s) => (
               <button
                 key={s}
                 onClick={() => onSubjectChange(s)}
                 className={`py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                  subject === s 
-                    ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' 
+                  subject === s
+                    ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                 }`}
               >

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { enrollInCourse } from '@/services/apiService';
+import { enrollInCourse, getModuleQuizStatus } from '@/services/apiService';
 
 // --- Types ---
 
@@ -39,6 +39,13 @@ interface CourseProgress {
     lastVisited: string | null; // Format: "unitNumber-subtopicIndex"
 }
 
+interface UnitQuizStatus {
+    unitNumber: number;
+    passed: boolean;
+    bestPercentage: number;
+    attemptCount: number;
+}
+
 // Helper to generate a simple course ID from the title
 const getCourseId = (title: string) => {
     return (title || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
@@ -70,6 +77,7 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
         completedTopics: [],
         lastVisited: null
     });
+    const [quizStatuses, setQuizStatuses] = useState<UnitQuizStatus[]>([]);
     // Use provided courseId or generate one from title
     const courseId = propCourseId || getCourseId(course.courseTitle);
 
@@ -79,10 +87,23 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
         setProgress(savedProgress);
     }, [courseId]);
 
+    // Fetch quiz statuses when enrolled
+    useEffect(() => {
+        if (progress.isEnrolled && courseId) {
+            getModuleQuizStatus(courseId)
+                .then(data => setQuizStatuses(data.units || []))
+                .catch(() => {});
+        }
+    }, [progress.isEnrolled, courseId]);
+
     // Calculate total topics and progress percentage
     const totalTopics = course.units.reduce((sum, unit) => sum + unit.subtopics.length, 0);
     const completedCount = progress.completedTopics.length;
     const progressPercentage = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
+
+    const getUnitQuizStatus = (unitNumber: number): UnitQuizStatus | undefined => {
+        return quizStatuses.find(s => s.unitNumber === unitNumber);
+    };
 
     const handleEnroll = async () => {
         const newProgress = { ...progress, isEnrolled: true };
@@ -196,7 +217,9 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
                 <div className="divide-y divide-gray-100">
                     {course.units.map((unit) => {
                         const moduleProgress = getModuleProgress(unit);
-                        const allCompleted = moduleProgress.completed === moduleProgress.total;
+                        const allTopicsDone = moduleProgress.completed === moduleProgress.total;
+                        const unitQuiz = getUnitQuizStatus(unit.unitNumber);
+                        const allCompleted = allTopicsDone && (unitQuiz?.passed ?? false);
 
                         return (
                             <div key={unit.unitNumber} className="group">
@@ -226,6 +249,14 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
                                                 <span>{unit.duration}</span>
                                                 <span>•</span>
                                                 <span>{moduleProgress.completed}/{moduleProgress.total} topics</span>
+                                                {unitQuiz && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span className={unitQuiz.passed ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                                                            Quiz: {unitQuiz.passed ? 'Passed' : `${Math.round(unitQuiz.bestPercentage)}%`}
+                                                        </span>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </button>
@@ -270,10 +301,14 @@ export const CourseView = ({ course, courseId: propCourseId }: { course: CourseP
                                                 );
                                             })}
                                             <li className="flex items-center gap-3 pt-2">
-                                                <div className="w-5 h-5 flex items-center justify-center text-blue-600">
+                                                <div className={`w-5 h-5 flex items-center justify-center ${unitQuiz?.passed ? 'text-green-600' : 'text-blue-600'}`}>
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                 </div>
-                                                <span className="font-medium text-blue-900 text-sm">Quiz: {unit.quiz.title} ({unit.quiz.questionCount} questions)</span>
+                                                <span className={`font-medium text-sm ${unitQuiz?.passed ? 'text-green-700' : 'text-blue-900'}`}>
+                                                    Quiz: {unit.quiz.title} ({unit.quiz.questionCount} questions)
+                                                    {unitQuiz?.passed && ' — Passed'}
+                                                    {unitQuiz && !unitQuiz.passed && ` — Best: ${Math.round(unitQuiz.bestPercentage)}%`}
+                                                </span>
                                             </li>
                                         </ul>
                                     </div>
