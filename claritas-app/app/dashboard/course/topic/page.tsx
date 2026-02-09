@@ -22,6 +22,7 @@ const Header = () => (
     </header>
 );
 import { updateCourseProgress } from '@/services/apiService';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 interface QuizQuestion {
     question: string;
@@ -153,7 +154,7 @@ function TopicPageContent() {
         const fetchContent = async () => {
             try {
                 // Using localhost explicitly as per main.py default
-                const res = await fetch('http://127.0.0.1:5000/generate_topic', {
+                const res = await fetch(`${API_BASE_URL}/generate_topic`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

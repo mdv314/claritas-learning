@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { updateCourseProgress } from '@/services/apiService';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -153,7 +154,7 @@ function TopicPageContent() {
         const fetchContent = async () => {
             try {
                 // Using localhost explicitly as per main.py default
-                const res = await fetch('http://127.0.0.1:5000/generate_topic', {
+                const res = await fetch(`${API_BASE_URL}/generate_topic`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

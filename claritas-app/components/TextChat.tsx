@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 interface Message {
     role: "user" | "model";
@@ -35,7 +36,7 @@ export default function TextChat({ courseId, unitNumber, questionIndex, question
         setLoading(true);
 
         try {
-            const res = await fetch('http://127.0.0.1:5000/quiz_help/text', {
+            const res = await fetch(`${API_BASE_URL}/quiz_help/text`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

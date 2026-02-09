@@ -1,12 +1,9 @@
 import os
-import json
 import uuid
-import asyncio
 from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from google import genai
@@ -15,18 +12,28 @@ from course_generator import CourseGenerator
 from assessment_generator import AssessmentGenerator
 from quiz_helper import QuizHelper
 from database import supabase
+from storage import storage_save, storage_load, ensure_bucket
 from fastapi.responses import JSONResponse
-import easyocr
 import jwt
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
 app = FastAPI()
 
+# Rate Limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS Middleware
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,40 +50,32 @@ except Exception as e:
 course_generator = CourseGenerator()
 assessment_generator = AssessmentGenerator()
 quiz_helper = QuizHelper()
-reader = easyocr.Reader(['en'])
 
 @app.get("/")
-def root():
+@limiter.limit("120/minute")
+def root(request: Request):
     return {"message": "works"}
 
-# Directory to store course plans locally
-COURSE_PLANS_DIR = os.path.join(os.path.dirname(__file__), "course_plans")
-os.makedirs(COURSE_PLANS_DIR, exist_ok=True)
+# Ensure Supabase Storage bucket exists at startup
+ensure_bucket()
 
 def save_course_plan_locally(course_plan: dict, topic: str) -> str:
     """
-    Save a course plan to a local JSON file.
+    Save a course plan to Supabase Storage.
     Returns the course ID (filename without extension).
     """
-    # Create a unique filename using timestamp and UUID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
-    # Sanitize topic for filename - replace spaces with underscores, remove special chars
     safe_topic = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in topic)[:50]
     course_id = f"{timestamp}_{safe_topic}_{unique_id}"
-    filename = f"{course_id}.json"
-    filepath = os.path.join(COURSE_PLANS_DIR, filename)
 
-    # Save the course plan with metadata
     data_to_save = {
         "course_id": course_id,
         "saved_at": datetime.now().isoformat(),
         "course_plan": course_plan
     }
 
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data_to_save, f, indent=2, ensure_ascii=False)
-
+    storage_save(f"{course_id}.json", data_to_save)
     return course_id
 
 # Define Pydantic models
@@ -91,7 +90,8 @@ class CourseGenerationRequest(BaseModel):
     materials_text: Optional[str] = ""
 
 @app.post("/generate")
-async def generate_text(request: PromptRequest):
+@limiter.limit("30/minute")
+async def generate_text(request: Request, prompt_request: PromptRequest):
     """
     An API endpoint to send a prompt to the Gemini model and receive a response.
     """
@@ -99,14 +99,16 @@ async def generate_text(request: PromptRequest):
         model_name = "gemini-2.0-flash-exp"
         response = genai_client.models.generate_content(
             model=model_name,
-            contents=[request.prompt],
+            contents=[prompt_request.prompt],
         )
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate_course")
+@limiter.limit("30/minute")
 async def generate_course_endpoint(
+    request: Request,
     topic: str = Form(...),
     skill_level: str = Form(...),
     age_group: str = Form(...),
@@ -146,18 +148,15 @@ async def generate_course_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/course/{course_id}")
-async def get_course(course_id: str):
+@limiter.limit("120/minute")
+async def get_course(request: Request, course_id: str):
     """
     Fetch a saved course plan by its ID.
     """
-    filepath = os.path.join(COURSE_PLANS_DIR, f"{course_id}.json")
-    if not os.path.exists(filepath):
+    data = storage_load(f"{course_id}.json")
+    if not data:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-
-    # Return the course plan with its ID
     return {"course_id": course_id, **data["course_plan"]}
 
 class TopicRequest(BaseModel):
@@ -166,42 +165,38 @@ class TopicRequest(BaseModel):
     subtopicIndex: int
 
 @app.post("/generate_topic")
-async def generate_topic(request: TopicRequest):
+@limiter.limit("30/minute")
+async def generate_topic(request: Request, topic_request: TopicRequest):
     """
     Generates content for a specific topic within a course.
     """
     try:
         # Load course plan
-        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        if not os.path.exists(filepath):
+        course_data = storage_load(f"{topic_request.courseId}.json")
+        if not course_data:
             raise HTTPException(status_code=404, detail="Course not found")
-            
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
-            
+
         course_plan = course_data["course_plan"]
-        
+
         # Check if topic content already exists
-        topic_filename = f"{request.courseId}_topic_{request.unitNumber}_{request.subtopicIndex}.json"
-        topic_filepath = os.path.join(COURSE_PLANS_DIR, topic_filename)
-        
-        if os.path.exists(topic_filepath):
-            with open(topic_filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        topic_filename = f"{topic_request.courseId}_topic_{topic_request.unitNumber}_{topic_request.subtopicIndex}.json"
+        cached = storage_load(topic_filename)
+        if cached:
+            return cached
 
         # Find the specific unit and subtopic
         units = course_plan.get("units", [])
-        unit = next((u for u in units if u.get("unitNumber") == request.unitNumber), None)
-        
+        unit = next((u for u in units if u.get("unitNumber") == topic_request.unitNumber), None)
+
         if not unit:
-            raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
-            
+            raise HTTPException(status_code=404, detail=f"Unit {topic_request.unitNumber} not found")
+
         subtopics = unit.get("subtopics", [])
-        if request.subtopicIndex < 0 or request.subtopicIndex >= len(subtopics):
+        if topic_request.subtopicIndex < 0 or topic_request.subtopicIndex >= len(subtopics):
             raise HTTPException(status_code=404, detail="Subtopic not found")
-            
-        subtopic_title = subtopics[request.subtopicIndex]
-        
+
+        subtopic_title = subtopics[topic_request.subtopicIndex]
+
         # Generate content
         content = course_generator.generate_topic_content(
             course_title=course_plan.get("courseTitle"),
@@ -211,14 +206,13 @@ async def generate_topic(request: TopicRequest):
             age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult"),
             additional_context=course_plan.get("description", "")
         )
-        
+
         if "error" in content:
             raise HTTPException(status_code=500, detail=content["error"])
-            
-        # Save locally
-        with open(topic_filepath, 'w', encoding='utf-8') as f:
-            json.dump(content, f, indent=2, ensure_ascii=False)
-            
+
+        # Save to storage
+        storage_save(topic_filename, content)
+
         return content
 
     except HTTPException as he:
@@ -266,7 +260,8 @@ class Assessment(BaseModel):
     recommendation: str
 
 @app.post("/generate_assessment")
-def generate_assessment(selectedOptions: SelectedOptions):
+@limiter.limit("30/minute")
+def generate_assessment(request: Request, selectedOptions: SelectedOptions):
     try:
         # Generate the full assessment dict
         assessment_dict = assessment_generator.generate_questions(
@@ -284,7 +279,8 @@ def generate_assessment(selectedOptions: SelectedOptions):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @app.post("/evaluate_assessment")
-def evaluate_assessment(quiz_attempt: QuizAttempt):
+@limiter.limit("30/minute")
+def evaluate_assessment(request: Request, quiz_attempt: QuizAttempt):
     correct = sum(1 for r in quiz_attempt.results if r.isCorrect)
     total = len(quiz_attempt.results)
     score = round((correct / total) * 100)
@@ -347,38 +343,37 @@ class ModuleQuizRequest(BaseModel):
     auth_id: Optional[str] = None
 
 @app.post("/generate_module_quiz")
-async def generate_module_quiz(request: ModuleQuizRequest):
+@limiter.limit("30/minute")
+async def generate_module_quiz(request: Request, quiz_request: ModuleQuizRequest):
     """Generate or retrieve a cached module-level quiz. Supports adaptive retakes."""
     try:
-        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        if not os.path.exists(filepath):
+        course_data = storage_load(f"{quiz_request.courseId}.json")
+        if not course_data:
             raise HTTPException(status_code=404, detail="Course not found")
 
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
         course_plan = course_data["course_plan"]
 
-        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
-        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
+        quiz_filename = f"{quiz_request.courseId}_module_quiz_{quiz_request.unitNumber}.json"
 
         # If not a retake, check cache
-        if not request.retake and os.path.exists(quiz_filepath):
-            with open(quiz_filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        if not quiz_request.retake:
+            cached = storage_load(quiz_filename)
+            if cached:
+                return cached
 
         # Find the unit
-        unit = next((u for u in course_plan.get("units", []) if u.get("unitNumber") == request.unitNumber), None)
+        unit = next((u for u in course_plan.get("units", []) if u.get("unitNumber") == quiz_request.unitNumber), None)
         if not unit:
-            raise HTTPException(status_code=404, detail=f"Unit {request.unitNumber} not found")
+            raise HTTPException(status_code=404, detail=f"Unit {quiz_request.unitNumber} not found")
 
         # For retakes, gather weakness data from past attempts
         previous_weakness_data = None
-        if request.retake and request.auth_id:
+        if quiz_request.retake and quiz_request.auth_id:
             try:
                 attempts = supabase.table("quiz_attempts").select("weak_subtopics,percentage").eq(
-                    "auth_id", request.auth_id
-                ).eq("course_id", request.courseId).eq(
-                    "unit_number", request.unitNumber
+                    "auth_id", quiz_request.auth_id
+                ).eq("course_id", quiz_request.courseId).eq(
+                    "unit_number", quiz_request.unitNumber
                 ).order("attempt_number", desc=True).limit(3).execute()
 
                 if attempts.data:
@@ -408,8 +403,7 @@ async def generate_module_quiz(request: ModuleQuizRequest):
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
 
-        with open(quiz_filepath, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
+        storage_save(quiz_filename, result)
 
         return result
 
@@ -427,22 +421,20 @@ class EvaluateQuizRequest(BaseModel):
     auth_id: Optional[str] = None
 
 @app.post("/evaluate_module_quiz")
-async def evaluate_module_quiz(request: EvaluateQuizRequest):
+@limiter.limit("30/minute")
+async def evaluate_module_quiz(request: Request, eval_request: EvaluateQuizRequest):
     """Evaluate a student's module quiz answers. MCQ scored locally, FRQ scored by Gemini."""
     try:
         # Load the quiz
-        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
-        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
-        if not os.path.exists(quiz_filepath):
+        quiz_filename = f"{eval_request.courseId}_module_quiz_{eval_request.unitNumber}.json"
+        quiz_data = storage_load(quiz_filename)
+        if not quiz_data:
             raise HTTPException(status_code=404, detail="Quiz not found. Generate it first.")
 
-        with open(quiz_filepath, 'r', encoding='utf-8') as f:
-            quiz_data = json.load(f)
-
         # Load course plan for metadata
-        filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
+        course_data = storage_load(f"{eval_request.courseId}.json")
+        if not course_data:
+            raise HTTPException(status_code=404, detail="Course not found")
         course_plan = course_data["course_plan"]
 
         # Score MCQ
@@ -450,7 +442,7 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
         mcq_score = 0
         mcq_results = []
         for i, q in enumerate(mcq_questions):
-            selected = request.mcqAnswers[i] if i < len(request.mcqAnswers) else -1
+            selected = eval_request.mcqAnswers[i] if i < len(eval_request.mcqAnswers) else -1
             correct = selected == q.get("correctAnswerIndex")
             if correct:
                 mcq_score += 1
@@ -468,7 +460,7 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
         frq_questions = quiz_data.get("freeResponse", [])
         eval_result = course_generator.evaluate_module_quiz(
             frq_questions=frq_questions,
-            frq_answers=request.frqAnswers,
+            frq_answers=eval_request.frqAnswers,
             skill_level=course_plan.get("metadata", {}).get("skillLevel", "Intermediate"),
             age_group=course_plan.get("metadata", {}).get("ageGroup", "Adult")
         )
@@ -500,13 +492,13 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
 
         # Store results in Supabase if auth_id is provided
         attempt_number = 1
-        if request.auth_id:
+        if eval_request.auth_id:
             try:
                 # Get latest attempt number
                 existing = supabase.table("quiz_attempts").select("attempt_number").eq(
-                    "auth_id", request.auth_id
-                ).eq("course_id", request.courseId).eq(
-                    "unit_number", request.unitNumber
+                    "auth_id", eval_request.auth_id
+                ).eq("course_id", eval_request.courseId).eq(
+                    "unit_number", eval_request.unitNumber
                 ).order("attempt_number", desc=True).limit(1).execute()
 
                 if existing.data:
@@ -515,9 +507,9 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
                 frq_evaluations = eval_result.get("frqEvaluations", [])
 
                 supabase.table("quiz_attempts").insert({
-                    "auth_id": request.auth_id,
-                    "course_id": request.courseId,
-                    "unit_number": request.unitNumber,
+                    "auth_id": eval_request.auth_id,
+                    "course_id": eval_request.courseId,
+                    "unit_number": eval_request.unitNumber,
                     "attempt_number": attempt_number,
                     "mcq_score": mcq_score,
                     "mcq_total": len(mcq_questions),
@@ -532,7 +524,7 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
                     "weak_subtopics": weak_subtopics,
                     "overall_feedback": eval_result.get("overallFeedback", "")
                 }).execute()
-                print(f"Quiz attempt #{attempt_number} stored for user {request.auth_id}")
+                print(f"Quiz attempt #{attempt_number} stored for user {eval_request.auth_id}")
             except Exception as store_err:
                 print(f"Warning: Failed to store quiz attempt: {store_err}")
                 # Non-blocking: still return results
@@ -543,7 +535,7 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
             "mcqTotal": len(mcq_questions),
             "frqEvaluations": eval_result.get("frqEvaluations", []),
             "frqQuestions": frq_questions,
-            "frqAnswers": request.frqAnswers,
+            "frqAnswers": eval_request.frqAnswers,
             "frqScore": frq_score,
             "frqTotal": frq_total,
             "totalScore": total_score,
@@ -566,7 +558,8 @@ async def evaluate_module_quiz(request: EvaluateQuizRequest):
 ################################
 
 @app.get("/quiz_attempts/{course_id}/{unit_number}")
-async def get_quiz_attempts(course_id: str, unit_number: int, auth_id: str):
+@limiter.limit("120/minute")
+async def get_quiz_attempts(request: Request, course_id: str, unit_number: int, auth_id: str):
     """Return all quiz attempts for a user/course/unit."""
     try:
         result = supabase.table("quiz_attempts").select(
@@ -580,7 +573,8 @@ async def get_quiz_attempts(course_id: str, unit_number: int, auth_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/module_quiz_status/{course_id}")
-async def get_module_quiz_status(course_id: str, auth_id: str):
+@limiter.limit("120/minute")
+async def get_module_quiz_status(request: Request, course_id: str, auth_id: str):
     """Return per-unit quiz pass/fail status for a course."""
     try:
         result = supabase.table("quiz_attempts").select(
@@ -624,18 +618,14 @@ class UpdateProgressRequest(BaseModel):
     last_visited: Optional[str] = None
 
 @app.post("/enroll")
-async def enroll_in_course(request: EnrollRequest):
+@limiter.limit("120/minute")
+async def enroll_in_course(request: Request, enroll_request: EnrollRequest):
     """Enroll a user in a course. Reads course JSON to denormalize metadata."""
-    print(f"[enroll] auth_id={request.auth_id}, course_id={request.course_id}")
+    print(f"[enroll] auth_id={enroll_request.auth_id}, course_id={enroll_request.course_id}")
 
-    filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
-    print(f"[enroll] looking for file: {filepath}")
-    print(f"[enroll] file exists: {os.path.exists(filepath)}")
-    if not os.path.exists(filepath):
+    course_data = storage_load(f"{enroll_request.course_id}.json")
+    if not course_data:
         raise HTTPException(status_code=404, detail="Course not found")
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        course_data = json.load(f)
 
     print(f"[enroll] course_data top-level keys: {list(course_data.keys())}")
     plan = course_data.get("course_plan", {})
@@ -644,8 +634,8 @@ async def enroll_in_course(request: EnrollRequest):
     print(f"[enroll] metadata: {metadata}")
 
     row = {
-        "auth_id": request.auth_id,
-        "course_id": request.course_id,
+        "auth_id": enroll_request.auth_id,
+        "course_id": enroll_request.course_id,
         "course_title": plan.get("courseTitle", "Untitled"),
         "course_description": plan.get("description", ""),
         "skill_level": metadata.get("skillLevel", ""),
@@ -666,13 +656,14 @@ async def enroll_in_course(request: EnrollRequest):
         if "duplicate" in error_msg.lower() or "unique" in error_msg.lower() or "23505" in error_msg:
             # Already enrolled - return existing record
             existing = supabase.table("user_courses").select("*").eq(
-                "auth_id", request.auth_id
-            ).eq("course_id", request.course_id).execute()
+                "auth_id", enroll_request.auth_id
+            ).eq("course_id", enroll_request.course_id).execute()
             return {"message": "Already enrolled", "data": existing.data}
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/user/{auth_id}/courses")
-async def get_user_courses(auth_id: str):
+@limiter.limit("120/minute")
+async def get_user_courses(request: Request, auth_id: str):
     """Return all enrolled courses for a user."""
     result = supabase.table("user_courses").select("*").eq(
         "auth_id", auth_id
@@ -680,26 +671,25 @@ async def get_user_courses(auth_id: str):
     return {"courses": result.data}
 
 @app.post("/update_progress")
-async def update_progress(request: UpdateProgressRequest):
+@limiter.limit("120/minute")
+async def update_progress(request: Request, progress_request: UpdateProgressRequest):
     """Update progress for a user's enrolled course."""
     # Verify enrollment exists
     existing = supabase.table("user_courses").select("id").eq(
-        "auth_id", request.auth_id
-    ).eq("course_id", request.course_id).execute()
+        "auth_id", progress_request.auth_id
+    ).eq("course_id", progress_request.course_id).execute()
 
     if not existing.data:
         raise HTTPException(status_code=404, detail="Not enrolled in this course")
 
     # Compute is_completed by comparing to total topics AND quiz passes
     is_completed = False
-    filepath = os.path.join(COURSE_PLANS_DIR, f"{request.course_id}.json")
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
+    course_data = storage_load(f"{progress_request.course_id}.json")
+    if course_data:
         plan = course_data.get("course_plan", {})
         units = plan.get("units", [])
         total_topics = sum(len(u.get("subtopics", [])) for u in units)
-        all_topics_done = total_topics > 0 and len(request.completed_topics) >= total_topics
+        all_topics_done = total_topics > 0 and len(progress_request.completed_topics) >= total_topics
 
         # Check if all units have a passing quiz attempt (>=80%)
         all_quizzes_passed = False
@@ -707,8 +697,8 @@ async def update_progress(request: UpdateProgressRequest):
             try:
                 quiz_results = supabase.table("quiz_attempts").select(
                     "unit_number,passed"
-                ).eq("auth_id", request.auth_id).eq(
-                    "course_id", request.course_id
+                ).eq("auth_id", progress_request.auth_id).eq(
+                    "course_id", progress_request.course_id
                 ).eq("passed", True).execute()
 
                 passed_units = set(r["unit_number"] for r in quiz_results.data)
@@ -720,15 +710,15 @@ async def update_progress(request: UpdateProgressRequest):
         is_completed = all_topics_done and all_quizzes_passed
 
     update_data = {
-        "completed_topics": request.completed_topics,
+        "completed_topics": progress_request.completed_topics,
         "is_completed": is_completed,
     }
-    if request.last_visited is not None:
-        update_data["last_visited"] = request.last_visited
+    if progress_request.last_visited is not None:
+        update_data["last_visited"] = progress_request.last_visited
 
     result = supabase.table("user_courses").update(update_data).eq(
-        "auth_id", request.auth_id
-    ).eq("course_id", request.course_id).execute()
+        "auth_id", progress_request.auth_id
+    ).eq("course_id", progress_request.course_id).execute()
 
     return {"message": "Progress updated", "data": result.data}
 
@@ -750,48 +740,43 @@ class QuizHelpTextRequest(BaseModel):
     studentMessage: str
 
 @app.post("/quiz_help/text")
-async def quiz_help_text(request: QuizHelpTextRequest):
+@limiter.limit("30/minute")
+async def quiz_help_text(request: Request, help_request: QuizHelpTextRequest):
     """Socratic tutor text help for a quiz question."""
     try:
         # Load quiz data
-        quiz_filename = f"{request.courseId}_module_quiz_{request.unitNumber}.json"
-        quiz_filepath = os.path.join(COURSE_PLANS_DIR, quiz_filename)
-        if not os.path.exists(quiz_filepath):
+        quiz_filename = f"{help_request.courseId}_module_quiz_{help_request.unitNumber}.json"
+        quiz_data = storage_load(quiz_filename)
+        if not quiz_data:
             raise HTTPException(status_code=404, detail="Quiz not found")
 
-        with open(quiz_filepath, 'r', encoding='utf-8') as f:
-            quiz_data = json.load(f)
-
         # Load course metadata for skill level / age group
-        course_filepath = os.path.join(COURSE_PLANS_DIR, f"{request.courseId}.json")
-        if not os.path.exists(course_filepath):
+        course_data = storage_load(f"{help_request.courseId}.json")
+        if not course_data:
             raise HTTPException(status_code=404, detail="Course not found")
-
-        with open(course_filepath, 'r', encoding='utf-8') as f:
-            course_data = json.load(f)
         course_plan = course_data["course_plan"]
         skill_level = course_plan.get("metadata", {}).get("skillLevel", "Intermediate")
         age_group = course_plan.get("metadata", {}).get("ageGroup", "Adult")
 
         # Get the specific question
-        if request.questionType == "mcq":
+        if help_request.questionType == "mcq":
             questions = quiz_data.get("multipleChoice", [])
         else:
             questions = quiz_data.get("freeResponse", [])
 
-        if request.questionIndex < 0 or request.questionIndex >= len(questions):
+        if help_request.questionIndex < 0 or help_request.questionIndex >= len(questions):
             raise HTTPException(status_code=404, detail="Question not found")
 
-        question = questions[request.questionIndex]
+        question = questions[help_request.questionIndex]
 
         # Build conversation history as list of dicts
-        history = [{"role": msg.role, "text": msg.text} for msg in request.conversationHistory]
+        history = [{"role": msg.role, "text": msg.text} for msg in help_request.conversationHistory]
 
         response_text = quiz_helper.text_help(
             question=question,
-            question_type=request.questionType,
+            question_type=help_request.questionType,
             conversation_history=history,
-            student_message=request.studentMessage,
+            student_message=help_request.studentMessage,
             skill_level=skill_level,
             age_group=age_group
         )
@@ -812,4 +797,5 @@ async def quiz_help_text(request: QuizHelpTextRequest):
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

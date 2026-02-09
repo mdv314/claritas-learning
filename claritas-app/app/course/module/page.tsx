@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { updateCourseProgress } from '@/services/apiService';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 // --- Types ---
 interface Quiz {
@@ -99,7 +100,7 @@ function ModulePageContent() {
             }
 
             try {
-                const response = await fetch(`http://127.0.0.1:5000/course/${courseId}`);
+                const response = await fetch(`${API_BASE_URL}/course/${courseId}`);
                 if (!response.ok) {
                     throw new Error('Course not found');
                 }

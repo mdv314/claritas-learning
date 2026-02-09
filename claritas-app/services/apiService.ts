@@ -1,8 +1,7 @@
 // services/apiService.ts
 import { useState } from "react";
 import { PreferenceProfile, UserInformation, LoginInfo, AuthResponse, GradeLevel, Subject, AssessmentSubmission, Question, CalibrationResult, Result, UserPreferences } from "../types";
-
-const API_BASE_URL = "http://127.0.0.1:5000";
+import { API_BASE_URL } from "@/lib/apiConfig";
 
 export const generateCourse = async (profile: PreferenceProfile): Promise<any> => {
     const formData = new FormData();

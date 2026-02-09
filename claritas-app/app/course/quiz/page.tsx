@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import QuizHelpPanel from '@/components/QuizHelpPanel';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -109,7 +110,7 @@ function QuizPageContent() {
         if (!courseId || !unitNumber) return;
         const fetchQuiz = async () => {
             try {
-                const res = await fetch('http://127.0.0.1:5000/generate_module_quiz', {
+                const res = await fetch(`${API_BASE_URL}/generate_module_quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ courseId, unitNumber: parseInt(unitNumber) })
@@ -136,7 +137,7 @@ function QuizPageContent() {
         try {
             const mcqArr = quiz.multipleChoice.map((_, i) => mcqAnswers[i] ?? -1);
             const frqArr = quiz.freeResponse.map((_, i) => frqAnswers[i] || '');
-            const res = await fetch('http://127.0.0.1:5000/evaluate_module_quiz', {
+            const res = await fetch(`${API_BASE_URL}/evaluate_module_quiz`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

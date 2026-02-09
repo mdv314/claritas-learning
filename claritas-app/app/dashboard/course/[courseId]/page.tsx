@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { CourseView } from '@/components/CourseView';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 interface Quiz {
     title: string;
@@ -59,7 +60,7 @@ export default function CoursePage() {
     useEffect(() => {
         const fetchCourse = async () => {
             try {
-                const response = await fetch(`http://127.0.0.1:5000/course/${courseId}`);
+                const response = await fetch(`${API_BASE_URL}/course/${courseId}`);
                 if (!response.ok) {
                     throw new Error('Course not found');
                 }

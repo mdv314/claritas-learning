@@ -6,6 +6,7 @@ import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import QuizHelpPanel from '@/components/QuizHelpPanel';
 import { evaluateModuleQuizAuth, generateModuleQuizRetake, getQuizAttempts } from '@/services/apiService';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 const Header = () => (
     <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -132,7 +133,7 @@ function QuizPageContent() {
         if (!courseId || !unitNumber) return;
         const fetchQuiz = async () => {
             try {
-                const res = await fetch('http://127.0.0.1:5000/generate_module_quiz', {
+                const res = await fetch(`${API_BASE_URL}/generate_module_quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ courseId, unitNumber: parseInt(unitNumber) })
@@ -171,7 +172,7 @@ function QuizPageContent() {
                 data = await evaluateModuleQuizAuth(courseId, parseInt(unitNumber), mcqArr, frqArr);
             } catch {
                 // Fallback to direct backend (no result storage)
-                const res = await fetch('http://127.0.0.1:5000/evaluate_module_quiz', {
+                const res = await fetch(`${API_BASE_URL}/evaluate_module_quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -211,7 +212,7 @@ function QuizPageContent() {
                 data = await generateModuleQuizRetake(courseId, parseInt(unitNumber));
             } catch {
                 // Fallback: generate fresh quiz without weakness data
-                const res = await fetch('http://127.0.0.1:5000/generate_module_quiz', {
+                const res = await fetch(`${API_BASE_URL}/generate_module_quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ courseId, unitNumber: parseInt(unitNumber), retake: true })
