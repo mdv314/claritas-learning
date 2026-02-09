@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+supabase
+google-genai
+python-dotenv
+pydantic
+easyocr
+PyJWT
+pytest
+httpx
